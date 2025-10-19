@@ -71,8 +71,8 @@ async def query_anthropic(data: QueryRequest):
         response = client.messages.create(
             model=data.model,
             max_tokens=600,
+            system=CUSTOM_INSTRUCTIONS, # Pass system message as a top-level parameter
             messages=[
-                {"role": "system", "content": CUSTOM_INSTRUCTIONS},
                 {"role": "user", "content": data.question},
             ],
         )
@@ -150,8 +150,8 @@ Create a comprehensive, well-structured SOP draft."""
         response = client.messages.create(
             model=model,
             max_tokens=2000,
+            system=CUSTOM_INSTRUCTIONS, # Pass system message as a top-level parameter
             messages=[
-                {"role": "system", "content": CUSTOM_INSTRUCTIONS},
                 {"role": "user", "content": prompt},
             ],
         )
@@ -176,8 +176,8 @@ async def ask_from_form(api_key: str = Form(...), question: str = Form(...)):
         resp = client.messages.create(
             model="claude-3-5-sonnet-20241022",
             max_tokens=500,
+            system=CUSTOM_INSTRUCTIONS, # Pass system message as a top-level parameter
             messages=[
-                {"role": "system", "content": CUSTOM_INSTRUCTIONS},
                 {"role": "user", "content": question},
             ],
         )
