@@ -60,3 +60,17 @@ async def root():
             "POST /ask": "Send form data if testing in browser"
         },
     }
+
+@app.get("/form")
+def web_form():
+    return """
+    <html>
+    <body>
+      <form action="/ask" method="post">
+        <input type="text" name="api_key" placeholder="Your Anthropic API Key" style="width:300px;"><br>
+        <textarea name="question" placeholder="Ask Claude..." rows="4" cols="50"></textarea><br>
+        <button type="submit">Send</button>
+      </form>
+    </body>
+    </html>
+    """
