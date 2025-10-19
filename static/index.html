@@ -19,7 +19,7 @@
         }
 
         .container {
-            max-width: 900px;
+            max-width: 1000px;
             margin: 0 auto;
             background: white;
             border-radius: 12px;
@@ -48,6 +48,42 @@
             padding: 40px;
         }
 
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .tab {
+            padding: 12px 24px;
+            background: none;
+            border: none;
+            font-size: 1.05em;
+            font-weight: 600;
+            color: #7f8c8d;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .tab:hover {
+            color: #667eea;
+        }
+
+        .tab.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
         .form-group {
             margin-bottom: 25px;
         }
@@ -62,6 +98,7 @@
 
         input[type="text"],
         input[type="password"],
+        input[type="file"],
         textarea,
         select {
             width: 100%;
@@ -71,6 +108,10 @@
             font-size: 1em;
             transition: border-color 0.3s;
             font-family: inherit;
+        }
+
+        input[type="file"] {
+            padding: 10px;
         }
 
         input[type="text"]:focus,
@@ -186,6 +227,22 @@
             line-height: 1.6;
             margin: 0;
         }
+
+        .file-info {
+            background: #f0f0f0;
+            padding: 10px 15px;
+            border-radius: 6px;
+            margin-top: 10px;
+            display: none;
+        }
+
+        .file-info.show {
+            display: block;
+        }
+
+        .file-info strong {
+            color: #2c3e50;
+        }
     </style>
 </head>
 <body>
@@ -200,42 +257,129 @@
                 <p><strong>Purpose:</strong> Capture and formalize knowledge from retiring employees in engineering and public works departments.</p>
             </div>
 
-            <form id="queryForm">
-                <div class="form-group">
-                    <label for="apiKey">Anthropic API Key:</label>
-                    <input type="password" id="apiKey" name="apiKey" placeholder="sk-ant-..." required>
-                </div>
-
-                <div class="form-group">
-                    <label for="model">Model:</label>
-                    <select id="model" name="model">
-                        <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet</option>
-                        <option value="claude-3-opus-20240229">Claude 3 Opus</option>
-                        <option value="claude-3-sonnet-20240229">Claude 3 Sonnet</option>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label for="question">Your Question:</label>
-                    <textarea id="question" name="question" placeholder="Example: What are the key maintenance procedures for water distribution systems that need to be documented?" required></textarea>
-                </div>
-
-                <button type="submit" class="btn" id="submitBtn">Ask PipeWrench AI</button>
-            </form>
-
-            <div class="loading" id="loading">
-                <div class="spinner"></div>
-                <p style="margin-top: 15px; color: #667eea; font-weight: 600;">Processing your question...</p>
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab('ask')">Ask Questions</button>
+                <button class="tab" onclick="switchTab('document')">Analyze Document</button>
             </div>
 
-            <div class="response-section" id="responseSection">
-                <h3>Response:</h3>
-                <div class="response-text" id="responseText"></div>
+            <!-- Ask Questions Tab -->
+            <div id="askTab" class="tab-content active">
+                <form id="queryForm">
+                    <div class="form-group">
+                        <label for="apiKey">Anthropic API Key:</label>
+                        <input type="password" id="apiKey" name="apiKey" placeholder="sk-ant-..." required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="model">Model:</label>
+                        <select id="model" name="model">
+                            <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet</option>
+                            <option value="claude-3-opus-20240229">Claude 3 Opus</option>
+                            <option value="claude-3-sonnet-20240229">Claude 3 Sonnet</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="question">Your Question:</label>
+                        <textarea id="question" name="question" placeholder="Example: What are the key maintenance procedures for water distribution systems that need to be documented?" required></textarea>
+                    </div>
+
+                    <button type="submit" class="btn" id="submitBtn">Ask PipeWrench AI</button>
+                </form>
+
+                <div class="loading" id="loading">
+                    <div class="spinner"></div>
+                    <p style="margin-top: 15px; color: #667eea; font-weight: 600;">Processing your question...</p>
+                </div>
+
+                <div class="response-section" id="responseSection">
+                    <h3>Response:</h3>
+                    <div class="response-text" id="responseText"></div>
+                </div>
+            </div>
+
+            <!-- Document Analysis Tab -->
+            <div id="documentTab" class="tab-content">
+                <form id="documentForm">
+                    <div class="form-group">
+                        <label for="apiKey2">Anthropic API Key:</label>
+                        <input type="password" id="apiKey2" name="apiKey2" placeholder="sk-ant-..." required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="documentFile">Upload Document (PDF, DOCX, TXT):</label>
+                        <input type="file" id="documentFile" name="documentFile" accept=".pdf,.docx,.txt" required>
+                        <div class="file-info" id="fileInfo">
+                            <strong>Selected:</strong> <span id="fileName"></span>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="analysisType">Analysis Type:</label>
+                        <select id="analysisType" name="analysisType">
+                            <option value="generate_questions">Generate Interview Questions</option>
+                            <option value="identify_gaps">Identify Knowledge Gaps</option>
+                            <option value="create_sop">Create SOP Draft</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="model2">Model:</label>
+                        <select id="model2" name="model2">
+                            <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet</option>
+                            <option value="claude-3-opus-20240229">Claude 3 Opus</option>
+                            <option value="claude-3-sonnet-20240229">Claude 3 Sonnet</option>
+                        </select>
+                    </div>
+
+                    <button type="submit" class="btn" id="submitDocBtn">Analyze Document</button>
+                </form>
+
+                <div class="loading" id="loading2">
+                    <div class="spinner"></div>
+                    <p style="margin-top: 15px; color: #667eea; font-weight: 600;">Analyzing document...</p>
+                </div>
+
+                <div class="response-section" id="responseSection2">
+                    <h3>Analysis Results:</h3>
+                    <div class="response-text" id="responseText2"></div>
+                </div>
             </div>
         </div>
     </div>
 
     <script>
+        // Tab switching
+        function switchTab(tab) {
+            const tabs = document.querySelectorAll('.tab');
+            const tabContents = document.querySelectorAll('.tab-content');
+            
+            tabs.forEach(t => t.classList.remove('active'));
+            tabContents.forEach(tc => tc.classList.remove('active'));
+            
+            if (tab === 'ask') {
+                tabs[0].classList.add('active');
+                document.getElementById('askTab').classList.add('active');
+            } else {
+                tabs[1].classList.add('active');
+                document.getElementById('documentTab').classList.add('active');
+            }
+        }
+
+        // File input handler
+        document.getElementById('documentFile').addEventListener('change', function(e) {
+            const fileInfo = document.getElementById('fileInfo');
+            const fileName = document.getElementById('fileName');
+            
+            if (e.target.files.length > 0) {
+                fileName.textContent = e.target.files[0].name;
+                fileInfo.classList.add('show');
+            } else {
+                fileInfo.classList.remove('show');
+            }
+        });
+
+        // Ask Questions Form
         const form = document.getElementById('queryForm');
         const loading = document.getElementById('loading');
         const responseSection = document.getElementById('responseSection');
@@ -249,7 +393,6 @@
             const question = document.getElementById('question').value;
             const model = document.getElementById('model').value;
 
-            // Show loading, hide previous response
             loading.classList.add('show');
             responseSection.classList.remove('show');
             submitBtn.disabled = true;
@@ -286,6 +429,64 @@
                 responseText.textContent = 'Network Error: ' + error.message;
             } finally {
                 submitBtn.disabled = false;
+            }
+        });
+
+        // Document Analysis Form
+        const docForm = document.getElementById('documentForm');
+        const loading2 = document.getElementById('loading2');
+        const responseSection2 = document.getElementById('responseSection2');
+        const responseText2 = document.getElementById('responseText2');
+        const submitDocBtn = document.getElementById('submitDocBtn');
+
+        docForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const apiKey = document.getElementById('apiKey2').value;
+            const file = document.getElementById('documentFile').files[0];
+            const analysisType = document.getElementById('analysisType').value;
+            const model = document.getElementById('model2').value;
+
+            if (!file) {
+                alert('Please select a file to upload');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('api_key', apiKey);
+            formData.append('file', file);
+            formData.append('analysis_type', analysisType);
+            formData.append('model', model);
+
+            loading2.classList.add('show');
+            responseSection2.classList.remove('show');
+            submitDocBtn.disabled = true;
+
+            try {
+                const response = await fetch('/analyze-document', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                loading2.classList.remove('show');
+                responseSection2.classList.add('show');
+                responseSection2.classList.remove('error');
+
+                if (data.success) {
+                    responseText2.textContent = data.response;
+                } else {
+                    responseSection2.classList.add('error');
+                    responseText2.textContent = 'Error: ' + (data.error || 'Unknown error occurred');
+                }
+            } catch (error) {
+                loading2.classList.remove('show');
+                responseSection2.classList.add('show');
+                responseSection2.classList.add('error');
+                responseText2.textContent = 'Network Error: ' + error.message;
+            } finally {
+                submitDocBtn.disabled = false;
             }
         });
     </script>
