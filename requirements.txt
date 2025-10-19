@@ -1,3 +1,6 @@
 fastapi
-anthropic>=0.34.0
+uvicorn[standard]
+anthropic
 python-multipart
+PyPDF2
+python-docx
