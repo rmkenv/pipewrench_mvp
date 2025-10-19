@@ -1,0 +1,2 @@
+fastapi
+anthropic>=0.34.0
