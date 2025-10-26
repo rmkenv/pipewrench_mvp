@@ -6,9 +6,11 @@
     <title>PipeWrench AI - Knowledge Preservation Platform</title>
     <style>
         :root {
-            --primary-color: #2563eb;
-            --primary-dark: #1e40af;
+            --primary-color: #1e40af;
+            --primary-dark: #1e3a8a;
             --primary-light: #3b82f6;
+            --accent-orange: #f97316;
+            --accent-orange-light: #fb923c;
             --secondary-color: #0891b2;
             --success-color: #10b981;
             --warning-color: #f59e0b;
@@ -18,7 +20,6 @@
             --text-primary: #f1f5f9;
             --text-secondary: #94a3b8;
             --border-color: #334155;
-            --accent-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         }
 
         * {
@@ -33,17 +34,20 @@
             color: var(--text-primary);
             line-height: 1.6;
             min-height: 100vh;
+            display: flex;
+            flex-direction: column;
         }
 
         /* Header */
         .header {
             background: var(--card-bg);
             border-bottom: 1px solid var(--border-color);
-            padding: 1.5rem 2rem;
+            padding: 1rem 2rem;
             position: sticky;
             top: 0;
             z-index: 100;
             backdrop-filter: blur(10px);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
         }
 
         .header-content {
@@ -61,21 +65,20 @@
         }
 
         .logo-icon {
-            font-size: 2rem;
+            font-size: 1.75rem;
         }
 
         .logo-text h1 {
-            font-size: 1.5rem;
+            font-size: 1.25rem;
             font-weight: 700;
-            background: var(--accent-gradient);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
+            color: var(--text-primary);
         }
 
         .logo-text p {
-            font-size: 0.875rem;
+            font-size: 0.75rem;
             color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
         }
 
         /* Main Container */
@@ -83,44 +86,39 @@
             max-width: 1400px;
             margin: 0 auto;
             padding: 2rem;
+            flex: 1;
         }
 
         /* Hero Section */
         .hero {
             text-align: center;
-            padding: 3rem 0;
+            padding: 2rem 0 1.5rem;
             margin-bottom: 2rem;
         }
 
         .hero h2 {
-            font-size: 2.5rem;
-            margin-bottom: 1rem;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
+            font-size: 2rem;
+            margin-bottom: 0.75rem;
+            color: var(--text-primary);
+            font-weight: 600;
         }
 
         .hero p {
-            font-size: 1.125rem;
+            font-size: 1rem;
             color: var(--text-secondary);
             max-width: 700px;
             margin: 0 auto;
+            line-height: 1.6;
         }
 
         /* Cards */
         .card {
             background: var(--card-bg);
             border: 1px solid var(--border-color);
-            border-radius: 1rem;
-            padding: 2rem;
-            margin-bottom: 2rem;
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
-
-        .card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            border-radius: 0.5rem;
+            padding: 1.75rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
         }
 
         .card-header {
@@ -133,14 +131,14 @@
         }
 
         .card-icon {
-            font-size: 2rem;
-            width: 3rem;
-            height: 3rem;
+            font-size: 1.5rem;
+            width: 2.5rem;
+            height: 2.5rem;
             display: flex;
             align-items: center;
             justify-content: center;
-            background: var(--accent-gradient);
-            border-radius: 0.75rem;
+            background: var(--primary-color);
+            border-radius: 0.5rem;
         }
 
         .card-title {
@@ -148,13 +146,14 @@
         }
 
         .card-title h3 {
-            font-size: 1.5rem;
+            font-size: 1.125rem;
             margin-bottom: 0.25rem;
+            font-weight: 600;
         }
 
         .card-title p {
             color: var(--text-secondary);
-            font-size: 0.875rem;
+            font-size: 0.8125rem;
         }
 
         /* Tabs */
@@ -182,7 +181,7 @@
         }
 
         .tab.active {
-            color: var(--primary-light);
+            color: var(--accent-orange);
         }
 
         .tab.active::after {
@@ -191,8 +190,8 @@
             bottom: -2px;
             left: 0;
             right: 0;
-            height: 2px;
-            background: var(--accent-gradient);
+            height: 3px;
+            background: var(--accent-orange);
         }
 
         .tab-content {
@@ -236,8 +235,8 @@
         select:focus,
         textarea:focus {
             outline: none;
-            border-color: var(--primary-light);
-            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+            border-color: var(--accent-orange);
+            box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
         }
 
         textarea {
@@ -261,8 +260,8 @@
         }
 
         .file-upload:hover {
-            border-color: var(--primary-light);
-            background: rgba(37, 99, 235, 0.05);
+            border-color: var(--accent-orange);
+            background: rgba(249, 115, 22, 0.05);
         }
 
         .file-upload input[type="file"] {
@@ -297,10 +296,10 @@
             padding: 0.875rem 2rem;
             border: none;
             border-radius: 0.5rem;
-            font-size: 1rem;
+            font-size: 0.875rem;
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.3s;
+            transition: all 0.2s;
             display: inline-flex;
             align-items: center;
             gap: 0.5rem;
@@ -309,19 +308,18 @@
         }
 
         .btn-primary {
-            background: var(--accent-gradient);
+            background: var(--accent-orange);
             color: white;
         }
 
         .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+            background: var(--accent-orange-light);
+            box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3);
         }
 
         .btn-primary:disabled {
             opacity: 0.5;
             cursor: not-allowed;
-            transform: none;
         }
 
         .btn-full {
@@ -390,13 +388,6 @@
             white-space: pre-wrap;
         }
 
-        /* Grid Layout */
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 2rem;
-        }
-
         /* Alert */
         .alert {
             padding: 1rem 1.5rem;
@@ -426,21 +417,21 @@
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
             gap: 1.5rem;
-            margin: 3rem 0;
+            margin: 2rem 0;
         }
 
         .feature-card {
             background: var(--card-bg);
             border: 1px solid var(--border-color);
-            border-radius: 0.75rem;
+            border-radius: 0.5rem;
             padding: 1.5rem;
             text-align: center;
-            transition: all 0.3s;
+            transition: all 0.2s;
         }
 
         .feature-card:hover {
-            transform: translateY(-5px);
             border-color: var(--primary-light);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
         }
 
         .feature-icon {
@@ -450,12 +441,152 @@
 
         .feature-card h4 {
             margin-bottom: 0.5rem;
-            font-size: 1.125rem;
+            font-size: 1rem;
+            font-weight: 600;
         }
 
         .feature-card p {
             color: var(--text-secondary);
             font-size: 0.875rem;
+        }
+
+        /* Footer */
+        .footer {
+            background: var(--card-bg);
+            border-top: 1px solid var(--border-color);
+            margin-top: 4rem;
+            padding: 3rem 2rem 2rem;
+        }
+
+        .footer-content {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .footer-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .footer-section h4 {
+            font-size: 0.875rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 1rem;
+            color: var(--text-primary);
+        }
+
+        .footer-section p,
+        .footer-section li {
+            font-size: 0.8125rem;
+            color: var(--text-secondary);
+            line-height: 1.8;
+            margin-bottom: 0.5rem;
+        }
+
+        .footer-section ul {
+            list-style: none;
+        }
+
+        .footer-section a {
+            color: var(--accent-orange);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        .footer-section a:hover {
+            color: var(--accent-orange-light);
+        }
+
+        .footer-bottom {
+            border-top: 1px solid var(--border-color);
+            padding-top: 2rem;
+            text-align: center;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            overflow-y: auto;
+        }
+
+        .modal.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+
+        .modal-content {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+            max-width: 900px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            padding: 2rem;
+            position: relative;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .modal-header h3 {
+            font-size: 1.5rem;
+            color: var(--text-primary);
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 2rem;
+            cursor: pointer;
+            line-height: 1;
+            padding: 0;
+            width: 2rem;
+            height: 2rem;
+        }
+
+        .modal-close:hover {
+            color: var(--text-primary);
+        }
+
+        .modal-body h4 {
+            font-size: 1.125rem;
+            margin-top: 1.5rem;
+            margin-bottom: 0.75rem;
+            color: var(--accent-orange);
+        }
+
+        .modal-body p,
+        .modal-body li {
+            color: var(--text-secondary);
+            line-height: 1.8;
+            margin-bottom: 0.75rem;
+        }
+
+        .modal-body ul {
+            margin-left: 1.5rem;
+            margin-bottom: 1rem;
         }
 
         /* Responsive */
@@ -465,19 +596,28 @@
             }
 
             .hero h2 {
-                font-size: 2rem;
+                font-size: 1.5rem;
             }
 
             .tabs {
-                flex-direction: column;
-                gap: 0;
+                flex-wrap: wrap;
+                gap: 0.5rem;
             }
 
             .tab {
                 padding: 0.75rem 1rem;
+                font-size: 0.875rem;
             }
 
             .card {
+                padding: 1.25rem;
+            }
+
+            .footer {
+                padding: 2rem 1rem 1rem;
+            }
+
+            .modal-content {
                 padding: 1.5rem;
             }
         }
@@ -529,40 +669,18 @@
             </div>
         </div>
 
-        <!-- API Key Configuration -->
-        <div class="card">
-            <div class="card-header">
-                <div class="card-icon">🔑</div>
-                <div class="card-title">
-                    <h3>Configuration</h3>
-                    <p>Enter your API credentials to get started</p>
-                </div>
-            </div>
-            <div class="form-group">
-                <label for="apiKey">Anthropic API Key</label>
-                <input type="password" id="apiKey" placeholder="sk-ant-..." required>
-            </div>
-            <div class="form-group">
-                <label for="model">AI Model</label>
-                <select id="model">
-                    <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet (Recommended)</option>
-                    <option value="claude-3-opus-20240229">Claude 3 Opus</option>
-                    <option value="claude-3-sonnet-20240229">Claude 3 Sonnet</option>
-                </select>
-            </div>
-        </div>
-
         <!-- Main Tabs -->
         <div class="card">
             <div class="tabs">
                 <button class="tab active" onclick="switchTab('ask')">💬 Ask Questions</button>
                 <button class="tab" onclick="switchTab('analyze')">📄 Analyze Document</button>
+                <button class="tab" onclick="switchTab('settings')">⚙️ Settings</button>
             </div>
 
             <!-- Ask Questions Tab -->
             <div id="askTab" class="tab-content active">
                 <div class="alert alert-error" id="askError"></div>
-                
+
                 <div class="form-group">
                     <label for="question">Your Question</label>
                     <textarea id="question" placeholder="What are the key considerations for water treatment plant maintenance?"></textarea>
@@ -617,6 +735,216 @@
                     <div class="response-content" id="analyzeResponseContent"></div>
                 </div>
             </div>
+
+            <!-- Settings Tab -->
+            <div id="settingsTab" class="tab-content">
+                <div class="card-header">
+                    <div class="card-icon">🔑</div>
+                    <div class="card-title">
+                        <h3>API Configuration</h3>
+                        <p>Enter your Anthropic API credentials</p>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="apiKey">Anthropic API Key</label>
+                    <input type="password" id="apiKey" placeholder="sk-ant-..." required>
+                    <p style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.5rem;">Your API key is stored locally and never sent to our servers.</p>
+                </div>
+                <input type="hidden" id="model" value="claude-3-5-sonnet-20241022">
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-content">
+            <div class="footer-grid">
+                <div class="footer-section">
+                    <h4>About PipeWrench AI</h4>
+                    <p>PipeWrench AI helps organizations preserve critical institutional knowledge through AI-powered document analysis and knowledge capture systems.</p>
+                </div>
+                <div class="footer-section">
+                    <h4>Legal & Compliance</h4>
+                    <ul>
+                        <li><a href="#" onclick="openModal('privacy'); return false;">Privacy Policy</a></li>
+                        <li><a href="#" onclick="openModal('transparency'); return false;">AI Training Data Transparency</a></li>
+                        <li><a href="#" onclick="openModal('terms'); return false;">Terms of Service</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Contact</h4>
+                    <p>For inquiries and support:</p>
+                    <p><a href="mailto:info@pipewrenchai.com">info@pipewrenchai.com</a></p>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>© 2025 PipeWrench AI. All rights reserved. | Compliant with California Generative AI Training Data Transparency Act (Effective January 1, 2026)</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Privacy Policy Modal -->
+    <div id="privacyModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Privacy Policy</h3>
+                <button class="modal-close" onclick="closeModal('privacy')">×</button>
+            </div>
+            <div class="modal-body">
+                <p><strong>Last Updated:</strong> January 1, 2025</p>
+                
+                <h4>1. Information We Collect</h4>
+                <p>PipeWrench AI operates as a client-side application. Your API keys and documents are processed locally in your browser and are not transmitted to our servers.</p>
+                
+                <h4>2. How We Use Your Information</h4>
+                <p>Your Anthropic API key is used solely to authenticate requests to Anthropic's Claude AI service. Documents you upload are sent directly to Anthropic's API for processing.</p>
+                
+                <h4>3. Data Storage</h4>
+                <p>API keys are stored in your browser's local storage. We do not maintain copies of your API keys or uploaded documents on our servers.</p>
+                
+                <h4>4. Third-Party Services</h4>
+                <p>This application uses Anthropic's Claude AI service. Your data is subject to <a href="https://www.anthropic.com/privacy" target="_blank">Anthropic's Privacy Policy</a>.</p>
+                
+                <h4>5. California Privacy Rights</h4>
+                <p>California residents have specific rights under the California Consumer Privacy Act (CCPA). Since we do not collect or store personal information, these rights are automatically satisfied.</p>
+                
+                <h4>6. Contact Us</h4>
+                <p>For privacy-related questions, contact us at <a href="mailto:privacy@pipewrenchai.com">privacy@pipewrenchai.com</a></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Transparency Modal -->
+    <div id="transparencyModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>AI Training Data Transparency Disclosure</h3>
+                <button class="modal-close" onclick="closeModal('transparency')">×</button>
+            </div>
+            <div class="modal-body">
+                <p><strong>Effective Date:</strong> January 1, 2025</p>
+                <p><strong>Compliance:</strong> California Generative AI Training Data Transparency Act (Effective January 1, 2026)</p>
+                
+                <h4>1. AI System Information</h4>
+                <p>PipeWrench AI utilizes Anthropic's Claude AI models (Claude 3.5 Sonnet) as the underlying generative AI system. This disclosure pertains to the training data used by Anthropic to develop these models.</p>
+                
+                <h4>2. Data Sources and Ownership</h4>
+                <p>The Claude AI models are trained by Anthropic PBC. According to Anthropic's public disclosures:</p>
+                <ul>
+                    <li>Training data includes publicly available information from the internet, licensed datasets, and data provided by users who have consented to its use for training purposes.</li>
+                    <li>Data sources support the system's intended purpose of natural language understanding, generation, and reasoning.</li>
+                    <li>Anthropic maintains detailed documentation of data provenance and licensing.</li>
+                </ul>
+                
+                <h4>3. Dataset Size and Characteristics</h4>
+                <ul>
+                    <li><strong>Size:</strong> Claude models are trained on datasets containing hundreds of billions of tokens of text data.</li>
+                    <li><strong>Data Types:</strong> Text-based data including books, articles, websites, code repositories, and other written content.</li>
+                    <li><strong>Labeling:</strong> Data includes both unlabeled text and human-labeled examples for specific tasks.</li>
+                </ul>
+                
+                <h4>4. Intellectual Property Considerations</h4>
+                <ul>
+                    <li>Training datasets may include copyrighted material used under fair use principles and licensed content.</li>
+                    <li>Anthropic implements filtering to reduce inclusion of copyrighted material where appropriate.</li>
+                    <li>Public domain content is included in training data.</li>
+                    <li>Anthropic respects intellectual property rights and provides mechanisms for rights holders to request content removal.</li>
+                </ul>
+                
+                <h4>5. Data Acquisition</h4>
+                <ul>
+                    <li>Some datasets are licensed from third-party providers.</li>
+                    <li>Publicly available data is collected through web scraping and other automated methods.</li>
+                    <li>User-contributed data is obtained with appropriate consent.</li>
+                </ul>
+                
+                <h4>6. Personal Information</h4>
+                <ul>
+                    <li>Training data may contain personal information that was publicly available on the internet.</li>
+                    <li>Anthropic implements privacy-preserving techniques to minimize retention of personal information.</li>
+                    <li>The system does not intentionally memorize or reproduce personal information from training data.</li>
+                    <li>No aggregate consumer information as defined under California law is knowingly included for the purpose of profiling.</li>
+                </ul>
+                
+                <h4>7. Data Processing and Modifications</h4>
+                <ul>
+                    <li><strong>Cleaning:</strong> Data undergoes filtering to remove low-quality, toxic, or harmful content.</li>
+                    <li><strong>Deduplication:</strong> Duplicate content is identified and removed to improve training efficiency.</li>
+                    <li><strong>Formatting:</strong> Data is processed into formats suitable for model training.</li>
+                    <li><strong>Purpose:</strong> These modifications improve model quality, safety, and performance.</li>
+                </ul>
+                
+                <h4>8. Data Collection Periods</h4>
+                <ul>
+                    <li>Training data was collected over multiple years prior to model training.</li>
+                    <li>Claude 3.5 Sonnet (released October 2024) has a knowledge cutoff of April 2024.</li>
+                    <li>Data collection is ongoing for future model versions.</li>
+                    <li>First used in development: Training data collection began in 2021 for early Claude models.</li>
+                </ul>
+                
+                <h4>9. Synthetic Data</h4>
+                <ul>
+                    <li>Synthetic data generation techniques are used to augment training data.</li>
+                    <li><strong>Functional Need:</strong> Synthetic data helps improve model performance on specific tasks, enhance safety, and fill gaps in naturally occurring data.</li>
+                    <li>Synthetic data is generated using earlier AI models and human oversight.</li>
+                </ul>
+                
+                <h4>10. Exemptions</h4>
+                <p>This system is not exempt under California law. It is not exclusively provided to federal entities for national security purposes, nor is it exclusively provided to hospital medical staff members.</p>
+                
+                <h4>11. Updates and Modifications</h4>
+                <p>This disclosure will be updated when substantial modifications are made to the AI system, including retraining or fine-tuning that materially affects performance. Last substantial modification: October 2024 (Claude 3.5 Sonnet release).</p>
+                
+                <h4>12. Additional Information</h4>
+                <p>For detailed information about Anthropic's training data and practices, please visit:</p>
+                <ul>
+                    <li><a href="https://www.anthropic.com" target="_blank">Anthropic's Official Website</a></li>
+                    <li><a href="https://www.anthropic.com/privacy" target="_blank">Anthropic's Privacy Policy</a></li>
+                </ul>
+                
+                <h4>13. Contact for Data Transparency Inquiries</h4>
+                <p>For questions regarding AI training data transparency, contact: <a href="mailto:transparency@pipewrenchai.com">transparency@pipewrenchai.com</a></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Terms Modal -->
+    <div id="termsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Terms of Service</h3>
+                <button class="modal-close" onclick="closeModal('terms')">×</button>
+            </div>
+            <div class="modal-body">
+                <p><strong>Last Updated:</strong> January 1, 2025</p>
+                
+                <h4>1. Acceptance of Terms</h4>
+                <p>By using PipeWrench AI, you agree to these Terms of Service and our Privacy Policy.</p>
+                
+                <h4>2. Use of Service</h4>
+                <p>PipeWrench AI is provided as-is for knowledge preservation purposes. You are responsible for:</p>
+                <ul>
+                    <li>Maintaining the confidentiality of your API keys</li>
+                    <li>Ensuring you have rights to upload and process documents</li>
+                    <li>Complying with Anthropic's Terms of Service</li>
+                    <li>Using the service in accordance with applicable laws</li>
+                </ul>
+                
+                <h4>3. API Key Usage</h4>
+                <p>You must provide your own Anthropic API key. API usage charges are billed directly by Anthropic according to their pricing.</p>
+                
+                <h4>4. Intellectual Property</h4>
+                <p>You retain all rights to documents you upload. Output generated by the AI system is subject to Anthropic's terms regarding AI-generated content.</p>
+                
+                <h4>5. Limitation of Liability</h4>
+                <p>PipeWrench AI is provided without warranties. We are not liable for any damages arising from use of the service.</p>
+                
+                <h4>6. Changes to Terms</h4>
+                <p>We reserve the right to modify these terms at any time. Continued use constitutes acceptance of modified terms.</p>
+                
+                <h4>7. Contact</h4>
+                <p>For questions about these terms, contact: <a href="mailto:legal@pipewrenchai.com">legal@pipewrenchai.com</a></p>
+            </div>
         </div>
     </div>
 
@@ -632,8 +960,10 @@
             document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
             if (tab === 'ask') {
                 document.getElementById('askTab').classList.add('active');
-            } else {
+            } else if (tab === 'analyze') {
                 document.getElementById('analyzeTab').classList.add('active');
+            } else if (tab === 'settings') {
+                document.getElementById('settingsTab').classList.add('active');
             }
         }
 
@@ -661,6 +991,23 @@
             responseBox.classList.add('show');
         }
 
+        function openModal(type) {
+            const modalId = type + 'Modal';
+            document.getElementById(modalId).classList.add('show');
+        }
+
+        function closeModal(type) {
+            const modalId = type + 'Modal';
+            document.getElementById(modalId).classList.remove('show');
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            if (event.target.classList.contains('modal')) {
+                event.target.classList.remove('show');
+            }
+        }
+
         async function askQuestion() {
             const apiKey = document.getElementById('apiKey').value;
             const question = document.getElementById('question').value;
@@ -668,7 +1015,7 @@
             const btn = document.getElementById('askBtn');
 
             if (!apiKey) {
-                showError('askError', 'Please enter your Anthropic API key');
+                showError('askError', 'Please enter your Anthropic API key in Settings');
                 return;
             }
 
@@ -717,7 +1064,7 @@
             const btn = document.getElementById('analyzeBtn');
 
             if (!apiKey) {
-                showError('analyzeError', 'Please enter your Anthropic API key');
+                showError('analyzeError', 'Please enter your Anthropic API key in Settings');
                 return;
             }
 
