@@ -5,9 +5,26 @@ import os
 from datetime import datetime
 from typing import Optional
 import uuid
+import io
+
+# Import for file parsing
+try:
+    from PyPDF2 import PdfReader
+except ImportError:
+    PdfReader = None
+
+try:
+    import docx
+except ImportError:
+    docx = None
+
+# Add path for local imports
+import sys
+sys.path.insert(0, os.path.dirname(__file__))
 
 # Import department prompts
-from api.department_prompts import get_department_prompt, get_department_list, get_department_name
+from department_prompts import get_department_prompt, get_department_list, get_department_name
+
 app = FastAPI()
 
 # Initialize Anthropic client
@@ -202,6 +219,12 @@ HTML_TEMPLATE = """
             transform: translateY(0);
         }
 
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
         .answer-box {
             background: var(--bg-dark);
             border-left: 4px solid var(--secondary-blue);
@@ -210,6 +233,7 @@ HTML_TEMPLATE = """
             margin-top: 16px;
             line-height: 1.8;
             color: var(--text-light);
+            white-space: pre-wrap;
         }
 
         #answer-container, #upload-result {
@@ -274,6 +298,15 @@ HTML_TEMPLATE = """
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
+        }
+
+        .error-message {
+            background: rgba(239, 68, 68, 0.1);
+            border-left: 4px solid #ef4444;
+            padding: 16px;
+            border-radius: 8px;
+            margin-top: 16px;
+            color: #fca5a5;
         }
 
         @media (max-width: 768px) {
@@ -347,10 +380,10 @@ HTML_TEMPLATE = """
             <div class="form-group">
                 <label for="file">Select Document:</label>
                 <input type="file" id="file" class="form-control" accept=".txt,.pdf,.doc,.docx">
-                <small>Supported formats: TXT, PDF, DOC, DOCX</small>
+                <small>Supported formats: TXT, PDF, DOC, DOCX (max 10MB)</small>
             </div>
 
-            <button onclick="uploadDocument()" class="btn btn-primary">Upload & Analyze</button>
+            <button onclick="uploadDocument()" class="btn btn-primary" id="upload-btn">Upload & Analyze</button>
             <div class="spinner" id="upload-spinner"></div>
 
             <div id="upload-result" style="display:none;">
@@ -500,10 +533,13 @@ HTML_TEMPLATE = """
                     body: formData
                 });
                 
-                if (!response.ok) throw new Error('API request failed');
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'API request failed');
+                }
                 
                 const data = await response.json();
-                document.getElementById('answer').innerHTML = data.answer.replace(/\\n/g, '<br>');
+                document.getElementById('answer').textContent = data.answer;
                 document.getElementById('answer-container').style.display = 'block';
             } catch (error) {
                 alert('Error: ' + error.message);
@@ -521,12 +557,20 @@ HTML_TEMPLATE = """
                 return;
             }
 
+            const file = fileInput.files[0];
+            if (file.size > 10 * 1024 * 1024) {
+                alert('File too large. Maximum size is 10MB.');
+                return;
+            }
+
             const spinner = document.getElementById('upload-spinner');
+            const uploadBtn = document.getElementById('upload-btn');
             spinner.style.display = 'block';
+            uploadBtn.disabled = true;
             document.getElementById('upload-result').style.display = 'none';
 
             const formData = new FormData();
-            formData.append('file', fileInput.files[0]);
+            formData.append('file', file);
             formData.append('department', department);
             formData.append('session_id', sessionId);
             if (apiKey) formData.append('api_key', apiKey);
@@ -537,15 +581,20 @@ HTML_TEMPLATE = """
                     body: formData
                 });
                 
-                if (!response.ok) throw new Error('Upload failed');
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Upload failed');
+                }
                 
                 const data = await response.json();
-                document.getElementById('analysis').innerHTML = data.analysis.replace(/\\n/g, '<br>');
+                document.getElementById('analysis').textContent = data.analysis;
                 document.getElementById('upload-result').style.display = 'block';
+                fileInput.value = '';
             } catch (error) {
                 alert('Error: ' + error.message);
             } finally {
                 spinner.style.display = 'none';
+                uploadBtn.disabled = false;
             }
         }
 
@@ -598,6 +647,51 @@ HTML_TEMPLATE = """
 </body>
 </html>
 """
+
+def extract_text_from_file(content: bytes, filename: str) -> str:
+    """Extract text from various file formats"""
+    
+    # Text files
+    if filename.endswith('.txt'):
+        try:
+            return content.decode('utf-8')
+        except UnicodeDecodeError:
+            return content.decode('latin-1', errors='ignore')
+    
+    # PDF files
+    elif filename.endswith('.pdf'):
+        if PdfReader is None:
+            raise HTTPException(status_code=400, detail="PDF support not available. Please install PyPDF2.")
+        
+        try:
+            pdf_file = io.BytesIO(content)
+            pdf_reader = PdfReader(pdf_file)
+            text = ""
+            for page in pdf_reader.pages:
+                text += page.extract_text() + "\n"
+            return text
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Failed to parse PDF: {str(e)}")
+    
+    # Word documents
+    elif filename.endswith('.docx'):
+        if docx is None:
+            raise HTTPException(status_code=400, detail="Word document support not available. Please install python-docx.")
+        
+        try:
+            doc_file = io.BytesIO(content)
+            doc = docx.Document(doc_file)
+            text = "\n".join([paragraph.text for paragraph in doc.paragraphs])
+            return text
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Failed to parse Word document: {str(e)}")
+    
+    # DOC files (old Word format)
+    elif filename.endswith('.doc'):
+        raise HTTPException(status_code=400, detail="Old Word format (.doc) not supported. Please convert to .docx or .txt")
+    
+    else:
+        raise HTTPException(status_code=400, detail="Unsupported file format. Please use TXT, PDF, or DOCX.")
 
 @app.get("/", response_class=HTMLResponse)
 async def home():
@@ -677,18 +771,35 @@ async def upload_document(
     if session_id not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
     
-    content = await file.read()
-    anthropic_client = Anthropic(api_key=api_key) if api_key else client
-    system_prompt = get_department_prompt(department)
-    
     try:
+        # Read file content
+        content = await file.read()
+        
+        # Check file size (10MB limit)
+        if len(content) > 10 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="File too large. Maximum size is 10MB.")
+        
+        # Extract text based on file type
+        text_content = extract_text_from_file(content, file.filename)
+        
+        # Limit content size for API (Claude has token limits)
+        max_chars = 100000  # ~100KB of text
+        if len(text_content) > max_chars:
+            text_content = text_content[:max_chars] + "\n\n[Content truncated due to size...]"
+        
+        if not text_content.strip():
+            raise HTTPException(status_code=400, detail="No text content found in document.")
+        
+        anthropic_client = Anthropic(api_key=api_key) if api_key else client
+        system_prompt = get_department_prompt(department)
+        
         response = anthropic_client.messages.create(
             model="claude-3-5-sonnet-20241022",
             max_tokens=4096,
-            system=system_prompt + "\n\nAnalyze this document and extract key institutional knowledge, procedures, and important information.",
+            system=system_prompt + "\n\nAnalyze this document and extract key institutional knowledge, procedures, and important information. Provide APA-style citations for any specific claims.",
             messages=[{
                 "role": "user",
-                "content": f"Document: {file.filename}\n\nContent:\n{content.decode('utf-8', errors='ignore')}"
+                "content": f"Document: {file.filename}\n\nContent:\n{text_content}"
             }]
         )
         
@@ -707,8 +818,10 @@ async def upload_document(
             "department": get_department_name(department)
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
 @app.post("/api/report/generate")
 async def generate_report(session_id: str = Form(...)):
@@ -729,7 +842,7 @@ async def generate_report(session_id: str = Form(...)):
             h1 {{ color: #1e40af; }}
             h2 {{ color: #3b82f6; margin-top: 30px; }}
             .question {{ background: #eff6ff; padding: 15px; margin: 20px 0; border-left: 4px solid #3b82f6; }}
-            .answer {{ margin: 10px 0; }}
+            .answer {{ margin: 10px 0; white-space: pre-wrap; }}
             .document {{ background: #fef3c7; padding: 15px; margin: 20px 0; border-left: 4px solid #f59e0b; }}
             .metadata {{ color: #6b7280; font-size: 0.9em; }}
         </style>
@@ -747,7 +860,7 @@ async def generate_report(session_id: str = Form(...)):
             <strong>Q{i} ({qa['department']}):</strong> {qa['question']}
             <div class="answer">
                 <strong>Answer:</strong><br>
-                {qa['answer'].replace(chr(10), '<br>')}
+                {qa['answer']}
             </div>
             <p class="metadata">Asked: {qa['timestamp']}</p>
         </div>
@@ -763,7 +876,7 @@ async def generate_report(session_id: str = Form(...)):
             <strong>Document:</strong> {doc['filename']} ({doc['department']})<br>
             <div class="answer">
                 <strong>Analysis:</strong><br>
-                {doc['analysis'].replace(chr(10), '<br>')}
+                {doc['analysis']}
             </div>
             <p class="metadata">Uploaded: {doc['uploaded_at']}</p>
         </div>
