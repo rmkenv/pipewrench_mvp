@@ -81,6 +81,24 @@
             letter-spacing: 0.1em;
         }
 
+        .session-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .session-badge {
+            background: var(--primary-color);
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .session-badge.active {
+            background: var(--success-color);
+        }
+
         /* Main Container */
         .container {
             max-width: 1400px;
@@ -207,6 +225,12 @@
             margin-bottom: 1.5rem;
         }
 
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+        }
+
         label {
             display: block;
             margin-bottom: 0.5rem;
@@ -219,6 +243,7 @@
 
         input[type="text"],
         input[type="password"],
+        input[type="date"],
         select,
         textarea {
             width: 100%;
@@ -322,9 +347,35 @@
             cursor: not-allowed;
         }
 
+        .btn-secondary {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: var(--primary-light);
+            box-shadow: 0 4px 12px rgba(30, 64, 175, 0.3);
+        }
+
+        .btn-success {
+            background: var(--success-color);
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #059669;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+        }
+
         .btn-full {
             width: 100%;
             justify-content: center;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
         }
 
         /* Loading Spinner */
@@ -412,6 +463,12 @@
             color: var(--success-color);
         }
 
+        .alert-info {
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid var(--primary-light);
+            color: var(--primary-light);
+        }
+
         /* Features Section */
         .features {
             display: grid;
@@ -448,6 +505,36 @@
         .feature-card p {
             color: var(--text-secondary);
             font-size: 0.875rem;
+        }
+
+        /* Session Stats */
+        .session-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: var(--dark-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+            padding: 1.25rem;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--accent-orange);
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-label {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
         }
 
         /* Footer */
@@ -620,6 +707,10 @@
             .modal-content {
                 padding: 1.5rem;
             }
+
+            .btn-group {
+                flex-direction: column;
+            }
         }
     </style>
 </head>
@@ -633,6 +724,9 @@
                     <h1>PipeWrench AI</h1>
                     <p>Knowledge Preservation Platform</p>
                 </div>
+            </div>
+            <div class="session-info">
+                <div class="session-badge" id="sessionBadge">No Active Session</div>
             </div>
         </div>
     </header>
@@ -672,13 +766,85 @@
         <!-- Main Tabs -->
         <div class="card">
             <div class="tabs">
-                <button class="tab active" onclick="switchTab('ask')">💬 Ask Questions</button>
+                <button class="tab active" onclick="switchTab('session')">👤 Session</button>
+                <button class="tab" onclick="switchTab('ask')">💬 Ask Questions</button>
                 <button class="tab" onclick="switchTab('analyze')">📄 Analyze Document</button>
                 <button class="tab" onclick="switchTab('settings')">⚙️ Settings</button>
             </div>
 
+            <!-- Session Tab -->
+            <div id="sessionTab" class="tab-content active">
+                <div class="alert alert-info" id="sessionAlert"></div>
+                
+                <div id="noSessionView">
+                    <div class="card-header">
+                        <div class="card-icon">👤</div>
+                        <div class="card-title">
+                            <h3>Start New Knowledge Capture Session</h3>
+                            <p>Enter employee information to begin documenting institutional knowledge</p>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="employeeName">Employee Name</label>
+                            <input type="text" id="employeeName" placeholder="John Smith" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="department">Department</label>
+                            <input type="text" id="department" placeholder="Public Works">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="position">Position/Title</label>
+                            <input type="text" id="position" placeholder="Senior Water Treatment Operator">
+                        </div>
+                        <div class="form-group">
+                            <label for="retirementDate">Retirement Date</label>
+                            <input type="date" id="retirementDate">
+                        </div>
+                    </div>
+
+                    <button class="btn btn-primary btn-full" onclick="createSession()">
+                        <span>Start Session</span>
+                    </button>
+                </div>
+
+                <div id="activeSessionView" style="display: none;">
+                    <div class="card-header">
+                        <div class="card-icon">✓</div>
+                        <div class="card-title">
+                            <h3>Active Session</h3>
+                            <p id="sessionEmployeeName"></p>
+                        </div>
+                    </div>
+
+                    <div class="session-stats">
+                        <div class="stat-card">
+                            <div class="stat-value" id="questionCount">0</div>
+                            <div class="stat-label">Questions Asked</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="documentCount">0</div>
+                            <div class="stat-label">Documents Analyzed</div>
+                        </div>
+                    </div>
+
+                    <div class="btn-group">
+                        <button class="btn btn-success" onclick="generateReport()">
+                            <span>📥 Download Report</span>
+                        </button>
+                        <button class="btn btn-secondary" onclick="endSession()">
+                            <span>End Session</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             <!-- Ask Questions Tab -->
-            <div id="askTab" class="tab-content active">
+            <div id="askTab" class="tab-content">
                 <div class="alert alert-error" id="askError"></div>
 
                 <div class="form-group">
@@ -950,6 +1116,22 @@
 
     <script>
         let selectedFile = null;
+        let currentSessionId = null;
+
+        // Load session from localStorage on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            const savedSessionId = localStorage.getItem('currentSessionId');
+            if (savedSessionId) {
+                currentSessionId = savedSessionId;
+                loadSessionData();
+            }
+            
+            // Load API key from localStorage
+            const savedApiKey = localStorage.getItem('apiKey');
+            if (savedApiKey) {
+                document.getElementById('apiKey').value = savedApiKey;
+            }
+        });
 
         function switchTab(tab) {
             // Update tab buttons
@@ -958,13 +1140,116 @@
 
             // Update tab content
             document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-            if (tab === 'ask') {
+            if (tab === 'session') {
+                document.getElementById('sessionTab').classList.add('active');
+            } else if (tab === 'ask') {
                 document.getElementById('askTab').classList.add('active');
             } else if (tab === 'analyze') {
                 document.getElementById('analyzeTab').classList.add('active');
             } else if (tab === 'settings') {
                 document.getElementById('settingsTab').classList.add('active');
             }
+        }
+
+        async function createSession() {
+            const employeeName = document.getElementById('employeeName').value;
+            const department = document.getElementById('department').value;
+            const position = document.getElementById('position').value;
+            const retirementDate = document.getElementById('retirementDate').value;
+
+            if (!employeeName) {
+                showAlert('sessionAlert', 'Please enter employee name', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/session/create', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        employee_name: employeeName,
+                        department: department,
+                        position: position,
+                        retirement_date: retirementDate
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    currentSessionId = data.session_id;
+                    localStorage.setItem('currentSessionId', currentSessionId);
+                    updateSessionUI();
+                    showAlert('sessionAlert', 'Session created successfully!', 'success');
+                } else {
+                    showAlert('sessionAlert', 'Failed to create session', 'error');
+                }
+            } catch (error) {
+                showAlert('sessionAlert', 'Network error: ' + error.message, 'error');
+            }
+        }
+
+        async function loadSessionData() {
+            if (!currentSessionId) return;
+
+            try {
+                const response = await fetch(`/session/${currentSessionId}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    updateSessionUI(data.session);
+                }
+            } catch (error) {
+                console.error('Error loading session:', error);
+            }
+        }
+
+        function updateSessionUI(sessionData = null) {
+            document.getElementById('noSessionView').style.display = 'none';
+            document.getElementById('activeSessionView').style.display = 'block';
+            
+            const badge = document.getElementById('sessionBadge');
+            badge.textContent = 'Active Session';
+            badge.classList.add('active');
+
+            if (sessionData) {
+                const metadata = sessionData.metadata || {};
+                document.getElementById('sessionEmployeeName').textContent = 
+                    `${metadata.employee_name || 'Unknown'} - ${metadata.position || 'Unknown Position'}`;
+                document.getElementById('questionCount').textContent = sessionData.questions?.length || 0;
+                document.getElementById('documentCount').textContent = sessionData.documents?.length || 0;
+            }
+        }
+
+        function endSession() {
+            if (confirm('Are you sure you want to end this session? Make sure to download the report first.')) {
+                currentSessionId = null;
+                localStorage.removeItem('currentSessionId');
+                
+                document.getElementById('noSessionView').style.display = 'block';
+                document.getElementById('activeSessionView').style.display = 'none';
+                
+                const badge = document.getElementById('sessionBadge');
+                badge.textContent = 'No Active Session';
+                badge.classList.remove('active');
+                
+                // Clear form
+                document.getElementById('employeeName').value = '';
+                document.getElementById('department').value = '';
+                document.getElementById('position').value = '';
+                document.getElementById('retirementDate').value = '';
+            }
+        }
+
+        function generateReport() {
+            if (!currentSessionId) {
+                alert('No active session');
+                return;
+            }
+            
+            window.open(`/report/${currentSessionId}`, '_blank');
         }
 
         function handleFileSelect(event) {
@@ -982,6 +1267,13 @@
             errorEl.textContent = message;
             errorEl.classList.add('show');
             setTimeout(() => errorEl.classList.remove('show'), 5000);
+        }
+
+        function showAlert(elementId, message, type) {
+            const alertEl = document.getElementById(elementId);
+            alertEl.textContent = message;
+            alertEl.className = `alert alert-${type} show`;
+            setTimeout(() => alertEl.classList.remove('show'), 5000);
         }
 
         function showResponse(responseId, contentId, content) {
@@ -1024,6 +1316,9 @@
                 return;
             }
 
+            // Save API key to localStorage
+            localStorage.setItem('apiKey', apiKey);
+
             // Show loading state
             btn.disabled = true;
             btn.innerHTML = '<span class="spinner"></span><span>Processing...</span>';
@@ -1038,7 +1333,8 @@
                     body: JSON.stringify({
                         api_key: apiKey,
                         question: question,
-                        model: model
+                        model: model,
+                        session_id: currentSessionId
                     })
                 });
 
@@ -1046,6 +1342,11 @@
 
                 if (data.success) {
                     showResponse('askResponse', 'askResponseContent', data.response);
+                    
+                    // Update session stats if active
+                    if (currentSessionId) {
+                        loadSessionData();
+                    }
                 } else {
                     showError('askError', data.error || 'An error occurred');
                 }
@@ -1073,6 +1374,9 @@
                 return;
             }
 
+            // Save API key to localStorage
+            localStorage.setItem('apiKey', apiKey);
+
             // Show loading state
             btn.disabled = true;
             btn.innerHTML = '<span class="spinner"></span><span>Analyzing...</span>';
@@ -1084,6 +1388,9 @@
                 formData.append('file', selectedFile);
                 formData.append('analysis_type', analysisType);
                 formData.append('model', model);
+                if (currentSessionId) {
+                    formData.append('session_id', currentSessionId);
+                }
 
                 const response = await fetch('/analyze-document', {
                     method: 'POST',
@@ -1094,6 +1401,11 @@
 
                 if (data.success) {
                     showResponse('analyzeResponse', 'analyzeResponseContent', data.response);
+                    
+                    // Update session stats if active
+                    if (currentSessionId) {
+                        loadSessionData();
+                    }
                 } else {
                     showError('analyzeError', data.error || 'An error occurred');
                 }
