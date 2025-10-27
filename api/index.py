@@ -7,8 +7,7 @@ from typing import Optional
 import uuid
 
 # Import department prompts
-from department_prompts import get_department_prompt, get_department_list, get_department_name
-
+from api.department_prompts import get_department_prompt, get_department_list, get_department_name
 app = FastAPI()
 
 # Initialize Anthropic client
