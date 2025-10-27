@@ -4,3 +4,4 @@ anthropic
 python-multipart
 PyPDF2
 python-docx
+jinja2
