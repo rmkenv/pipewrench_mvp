@@ -3,1421 +3,596 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PipeWrench AI - Knowledge Preservation Platform</title>
+    <title>PipeWrench AI - Municipal Knowledge Capture</title>
     <style>
-        :root {
-            --primary-color: #1e40af;
-            --primary-dark: #1e3a8a;
-            --primary-light: #3b82f6;
-            --accent-orange: #f97316;
-            --accent-orange-light: #fb923c;
-            --secondary-color: #0891b2;
-            --success-color: #10b981;
-            --warning-color: #f59e0b;
-            --danger-color: #ef4444;
-            --dark-bg: #0f172a;
-            --card-bg: #1e293b;
-            --text-primary: #f1f5f9;
-            --text-secondary: #94a3b8;
-            --border-color: #334155;
-        }
-
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
 
+        :root {
+            --primary-blue: #1e40af;
+            --secondary-blue: #3b82f6;
+            --light-blue: #eff6ff;
+            --accent-orange: #f59e0b;
+            --dark-orange: #d97706;
+            --bg-dark: #0f172a;
+            --bg-card: #1e293b;
+            --text-light: #f1f5f9;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: var(--dark-bg);
-            color: var(--text-primary);
-            line-height: 1.6;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, var(--bg-dark) 0%, #1e293b 100%);
+            color: var(--text-light);
             min-height: 100vh;
-            display: flex;
-            flex-direction: column;
+            padding: 20px;
         }
 
-        /* Header */
-        .header {
-            background: var(--card-bg);
-            border-bottom: 1px solid var(--border-color);
-            padding: 1rem 2rem;
-            position: sticky;
-            top: 0;
-            z-index: 100;
-            backdrop-filter: blur(10px);
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-        }
-
-        .header-content {
-            max-width: 1400px;
-            margin: 0 auto;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .logo {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-
-        .logo-icon {
-            font-size: 1.75rem;
-        }
-
-        .logo-text h1 {
-            font-size: 1.25rem;
-            font-weight: 700;
-            color: var(--text-primary);
-        }
-
-        .logo-text p {
-            font-size: 0.75rem;
-            color: var(--text-secondary);
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-        }
-
-        .session-info {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-
-        .session-badge {
-            background: var(--primary-color);
-            padding: 0.5rem 1rem;
-            border-radius: 0.5rem;
-            font-size: 0.75rem;
-            font-weight: 600;
-        }
-
-        .session-badge.active {
-            background: var(--success-color);
-        }
-
-        /* Main Container */
         .container {
-            max-width: 1400px;
+            max-width: 1200px;
             margin: 0 auto;
-            padding: 2rem;
-            flex: 1;
+            background: var(--bg-card);
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
         }
 
-        /* Hero Section */
-        .hero {
+        header {
+            background: linear-gradient(135deg, var(--primary-blue) 0%, var(--secondary-blue) 100%);
+            padding: 40px;
             text-align: center;
-            padding: 2rem 0 1.5rem;
-            margin-bottom: 2rem;
+            border-bottom: 4px solid var(--accent-orange);
         }
 
-        .hero h2 {
-            font-size: 2rem;
-            margin-bottom: 0.75rem;
-            color: var(--text-primary);
-            font-weight: 600;
+        header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
         }
 
-        .hero p {
-            font-size: 1rem;
-            color: var(--text-secondary);
-            max-width: 700px;
-            margin: 0 auto;
-            line-height: 1.6;
+        header p {
+            font-size: 1.1em;
+            color: var(--light-blue);
+            opacity: 0.95;
         }
 
-        /* Cards */
-        .card {
-            background: var(--card-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 0.5rem;
-            padding: 1.75rem;
-            margin-bottom: 1.5rem;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-        }
-
-        .card-header {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            margin-bottom: 1.5rem;
-            padding-bottom: 1rem;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .card-icon {
-            font-size: 1.5rem;
-            width: 2.5rem;
-            height: 2.5rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: var(--primary-color);
-            border-radius: 0.5rem;
-        }
-
-        .card-title {
-            flex: 1;
-        }
-
-        .card-title h3 {
-            font-size: 1.125rem;
-            margin-bottom: 0.25rem;
-            font-weight: 600;
-        }
-
-        .card-title p {
-            color: var(--text-secondary);
-            font-size: 0.8125rem;
-        }
-
-        /* Tabs */
         .tabs {
             display: flex;
-            gap: 1rem;
-            margin-bottom: 2rem;
-            border-bottom: 2px solid var(--border-color);
+            background: var(--bg-dark);
+            border-bottom: 2px solid var(--border);
+            overflow-x: auto;
         }
 
-        .tab {
-            padding: 1rem 2rem;
-            background: none;
+        .tab-btn {
+            flex: 1;
+            padding: 18px 24px;
+            background: transparent;
             border: none;
-            color: var(--text-secondary);
-            font-size: 1rem;
+            color: var(--text-muted);
+            font-size: 1em;
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.3s;
-            position: relative;
+            transition: all 0.3s ease;
+            border-bottom: 3px solid transparent;
+            white-space: nowrap;
         }
 
-        .tab:hover {
-            color: var(--text-primary);
+        .tab-btn:hover {
+            background: rgba(59, 130, 246, 0.1);
+            color: var(--secondary-blue);
         }
 
-        .tab.active {
+        .tab-btn.active {
             color: var(--accent-orange);
-        }
-
-        .tab.active::after {
-            content: '';
-            position: absolute;
-            bottom: -2px;
-            left: 0;
-            right: 0;
-            height: 3px;
-            background: var(--accent-orange);
+            border-bottom-color: var(--accent-orange);
+            background: rgba(245, 158, 11, 0.1);
         }
 
         .tab-content {
             display: none;
+            padding: 40px;
+            animation: fadeIn 0.3s ease;
         }
 
         .tab-content.active {
             display: block;
         }
 
-        /* Form Elements */
-        .form-group {
-            margin-bottom: 1.5rem;
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
-        .form-row {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 1rem;
+        h2 {
+            color: var(--secondary-blue);
+            margin-bottom: 24px;
+            font-size: 1.8em;
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 12px;
+        }
+
+        .form-group {
+            margin-bottom: 24px;
         }
 
         label {
             display: block;
-            margin-bottom: 0.5rem;
+            margin-bottom: 8px;
+            color: var(--text-light);
             font-weight: 600;
-            color: var(--text-primary);
-            font-size: 0.875rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
+            font-size: 0.95em;
         }
 
-        input[type="text"],
-        input[type="password"],
-        input[type="date"],
-        select,
-        textarea {
+        .form-control {
             width: 100%;
-            padding: 0.875rem 1rem;
-            background: var(--dark-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 0.5rem;
-            color: var(--text-primary);
-            font-size: 1rem;
-            transition: all 0.3s;
-        }
-
-        input:focus,
-        select:focus,
-        textarea:focus {
-            outline: none;
-            border-color: var(--accent-orange);
-            box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
-        }
-
-        textarea {
-            resize: vertical;
-            min-height: 150px;
+            padding: 14px 16px;
+            background: var(--bg-dark);
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-light);
+            font-size: 1em;
+            transition: all 0.3s ease;
             font-family: inherit;
         }
 
-        /* File Upload */
-        .file-upload {
-            position: relative;
-            display: block;
-            width: 100%;
-            padding: 2rem;
-            background: var(--dark-bg);
-            border: 2px dashed var(--border-color);
-            border-radius: 0.5rem;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.3s;
+        .form-control:focus {
+            outline: none;
+            border-color: var(--secondary-blue);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
         }
 
-        .file-upload:hover {
-            border-color: var(--accent-orange);
-            background: rgba(249, 115, 22, 0.05);
-        }
-
-        .file-upload input[type="file"] {
-            position: absolute;
-            opacity: 0;
-            width: 100%;
-            height: 100%;
+        select.form-control {
             cursor: pointer;
         }
 
-        .file-upload-icon {
-            font-size: 3rem;
-            margin-bottom: 1rem;
-            color: var(--text-secondary);
+        textarea.form-control {
+            resize: vertical;
+            min-height: 120px;
         }
 
-        .file-upload-text {
-            color: var(--text-secondary);
-        }
-
-        .file-name {
-            margin-top: 1rem;
-            padding: 0.5rem 1rem;
-            background: var(--card-bg);
-            border-radius: 0.5rem;
-            color: var(--success-color);
-            font-weight: 600;
-        }
-
-        /* Buttons */
         .btn {
-            padding: 0.875rem 2rem;
+            padding: 14px 32px;
             border: none;
-            border-radius: 0.5rem;
-            font-size: 0.875rem;
+            border-radius: 8px;
+            font-size: 1em;
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.2s;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
+            transition: all 0.3s ease;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
+            letter-spacing: 0.5px;
         }
 
         .btn-primary {
-            background: var(--accent-orange);
+            background: linear-gradient(135deg, var(--accent-orange) 0%, var(--dark-orange) 100%);
             color: white;
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
         }
 
         .btn-primary:hover {
-            background: var(--accent-orange-light);
-            box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(245, 158, 11, 0.4);
         }
 
-        .btn-primary:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
+        .btn-primary:active {
+            transform: translateY(0);
         }
 
-        .btn-secondary {
-            background: var(--primary-color);
-            color: white;
+        .answer-box {
+            background: var(--bg-dark);
+            border-left: 4px solid var(--secondary-blue);
+            padding: 24px;
+            border-radius: 8px;
+            margin-top: 16px;
+            line-height: 1.8;
+            color: var(--text-light);
         }
 
-        .btn-secondary:hover {
-            background: var(--primary-light);
-            box-shadow: 0 4px 12px rgba(30, 64, 175, 0.3);
+        #answer-container, #upload-result {
+            margin-top: 32px;
+            animation: fadeIn 0.5s ease;
         }
 
-        .btn-success {
-            background: var(--success-color);
-            color: white;
+        #answer-container h3, #upload-result h3 {
+            color: var(--accent-orange);
+            margin-bottom: 16px;
+            font-size: 1.4em;
         }
 
-        .btn-success:hover {
-            background: #059669;
-            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+        small {
+            display: block;
+            margin-top: 8px;
+            color: var(--text-muted);
+            font-size: 0.85em;
         }
 
-        .btn-full {
-            width: 100%;
-            justify-content: center;
+        footer {
+            background: var(--bg-dark);
+            padding: 32px 40px;
+            border-top: 2px solid var(--border);
+            color: var(--text-muted);
+            font-size: 0.9em;
+            line-height: 1.6;
         }
 
-        .btn-group {
-            display: flex;
-            gap: 1rem;
-            margin-top: 1rem;
+        footer h4 {
+            color: var(--secondary-blue);
+            margin-bottom: 12px;
+            font-size: 1.1em;
         }
 
-        /* Loading Spinner */
+        footer a {
+            color: var(--accent-orange);
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+
+        footer a:hover {
+            color: var(--dark-orange);
+            text-decoration: underline;
+        }
+
+        .footer-section {
+            margin-bottom: 20px;
+        }
+
+        /* Loading spinner */
         .spinner {
-            display: inline-block;
-            width: 1rem;
-            height: 1rem;
-            border: 2px solid rgba(255, 255, 255, 0.3);
-            border-top-color: white;
+            border: 3px solid var(--border);
+            border-top: 3px solid var(--accent-orange);
             border-radius: 50%;
-            animation: spin 0.8s linear infinite;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+            display: none;
         }
 
         @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        /* Response Box */
-        .response-box {
-            margin-top: 2rem;
-            padding: 2rem;
-            background: var(--dark-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 0.5rem;
-            display: none;
-        }
-
-        .response-box.show {
-            display: block;
-            animation: slideIn 0.3s ease-out;
-        }
-
-        @keyframes slideIn {
-            from {
-                opacity: 0;
-                transform: translateY(20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .response-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1rem;
-            padding-bottom: 1rem;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .response-header h4 {
-            font-size: 1.125rem;
-            color: var(--success-color);
-        }
-
-        .response-content {
-            color: var(--text-primary);
-            line-height: 1.8;
-            white-space: pre-wrap;
-        }
-
-        /* Alert */
-        .alert {
-            padding: 1rem 1.5rem;
-            border-radius: 0.5rem;
-            margin-bottom: 1rem;
-            display: none;
-        }
-
-        .alert.show {
-            display: block;
-        }
-
-        .alert-error {
-            background: rgba(239, 68, 68, 0.1);
-            border: 1px solid var(--danger-color);
-            color: var(--danger-color);
-        }
-
-        .alert-success {
-            background: rgba(16, 185, 129, 0.1);
-            border: 1px solid var(--success-color);
-            color: var(--success-color);
-        }
-
-        .alert-info {
-            background: rgba(59, 130, 246, 0.1);
-            border: 1px solid var(--primary-light);
-            color: var(--primary-light);
-        }
-
-        /* Features Section */
-        .features {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 1.5rem;
-            margin: 2rem 0;
-        }
-
-        .feature-card {
-            background: var(--card-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 0.5rem;
-            padding: 1.5rem;
-            text-align: center;
-            transition: all 0.2s;
-        }
-
-        .feature-card:hover {
-            border-color: var(--primary-light);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-        }
-
-        .feature-icon {
-            font-size: 2.5rem;
-            margin-bottom: 1rem;
-        }
-
-        .feature-card h4 {
-            margin-bottom: 0.5rem;
-            font-size: 1rem;
-            font-weight: 600;
-        }
-
-        .feature-card p {
-            color: var(--text-secondary);
-            font-size: 0.875rem;
-        }
-
-        /* Session Stats */
-        .session-stats {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1rem;
-            margin-bottom: 2rem;
-        }
-
-        .stat-card {
-            background: var(--dark-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 0.5rem;
-            padding: 1.25rem;
-            text-align: center;
-        }
-
-        .stat-value {
-            font-size: 2rem;
-            font-weight: 700;
-            color: var(--accent-orange);
-            margin-bottom: 0.5rem;
-        }
-
-        .stat-label {
-            font-size: 0.875rem;
-            color: var(--text-secondary);
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-
-        /* Footer */
-        .footer {
-            background: var(--card-bg);
-            border-top: 1px solid var(--border-color);
-            margin-top: 4rem;
-            padding: 3rem 2rem 2rem;
-        }
-
-        .footer-content {
-            max-width: 1400px;
-            margin: 0 auto;
-        }
-
-        .footer-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 2rem;
-            margin-bottom: 2rem;
-        }
-
-        .footer-section h4 {
-            font-size: 0.875rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            margin-bottom: 1rem;
-            color: var(--text-primary);
-        }
-
-        .footer-section p,
-        .footer-section li {
-            font-size: 0.8125rem;
-            color: var(--text-secondary);
-            line-height: 1.8;
-            margin-bottom: 0.5rem;
-        }
-
-        .footer-section ul {
-            list-style: none;
-        }
-
-        .footer-section a {
-            color: var(--accent-orange);
-            text-decoration: none;
-            transition: color 0.2s;
-        }
-
-        .footer-section a:hover {
-            color: var(--accent-orange-light);
-        }
-
-        .footer-bottom {
-            border-top: 1px solid var(--border-color);
-            padding-top: 2rem;
-            text-align: center;
-            font-size: 0.75rem;
-            color: var(--text-secondary);
-        }
-
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 1000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.8);
-            overflow-y: auto;
-        }
-
-        .modal.show {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 2rem;
-        }
-
-        .modal-content {
-            background: var(--card-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 0.5rem;
-            max-width: 900px;
-            width: 100%;
-            max-height: 90vh;
-            overflow-y: auto;
-            padding: 2rem;
-            position: relative;
-        }
-
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1.5rem;
-            padding-bottom: 1rem;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .modal-header h3 {
-            font-size: 1.5rem;
-            color: var(--text-primary);
-        }
-
-        .modal-close {
-            background: none;
-            border: none;
-            color: var(--text-secondary);
-            font-size: 2rem;
-            cursor: pointer;
-            line-height: 1;
-            padding: 0;
-            width: 2rem;
-            height: 2rem;
-        }
-
-        .modal-close:hover {
-            color: var(--text-primary);
-        }
-
-        .modal-body h4 {
-            font-size: 1.125rem;
-            margin-top: 1.5rem;
-            margin-bottom: 0.75rem;
-            color: var(--accent-orange);
-        }
-
-        .modal-body p,
-        .modal-body li {
-            color: var(--text-secondary);
-            line-height: 1.8;
-            margin-bottom: 0.75rem;
-        }
-
-        .modal-body ul {
-            margin-left: 1.5rem;
-            margin-bottom: 1rem;
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
 
         /* Responsive */
         @media (max-width: 768px) {
-            .container {
-                padding: 1rem;
+            header h1 {
+                font-size: 1.8em;
             }
 
-            .hero h2 {
-                font-size: 1.5rem;
+            .tab-content {
+                padding: 24px;
             }
 
             .tabs {
                 flex-wrap: wrap;
-                gap: 0.5rem;
             }
 
-            .tab {
-                padding: 0.75rem 1rem;
-                font-size: 0.875rem;
-            }
-
-            .card {
-                padding: 1.25rem;
-            }
-
-            .footer {
-                padding: 2rem 1rem 1rem;
-            }
-
-            .modal-content {
-                padding: 1.5rem;
-            }
-
-            .btn-group {
-                flex-direction: column;
+            .tab-btn {
+                flex: 1 1 50%;
             }
         }
     </style>
 </head>
 <body>
-    <!-- Header -->
-    <header class="header">
-        <div class="header-content">
-            <div class="logo">
-                <div class="logo-icon">🔧</div>
-                <div class="logo-text">
-                    <h1>PipeWrench AI</h1>
-                    <p>Knowledge Preservation Platform</p>
-                </div>
-            </div>
-            <div class="session-info">
-                <div class="session-badge" id="sessionBadge">No Active Session</div>
-            </div>
-        </div>
-    </header>
-
-    <!-- Main Container -->
     <div class="container">
-        <!-- Hero Section -->
-        <section class="hero">
-            <h2>Preserve Institutional Knowledge</h2>
-            <p>Capture and formalize critical knowledge from retiring employees in engineering and public works departments using AI-powered analysis.</p>
-        </section>
+        <header>
+            <h1>🔧 PipeWrench AI</h1>
+            <p>Preserving Institutional Knowledge in Public Works</p>
+        </header>
 
-        <!-- Features -->
-        <div class="features">
-            <div class="feature-card">
-                <div class="feature-icon">💬</div>
-                <h4>Interactive Q&A</h4>
-                <p>Ask targeted questions and get expert-level responses</p>
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="query">Ask Questions</button>
+            <button class="tab-btn" data-tab="upload">Upload Documents</button>
+            <button class="tab-btn" data-tab="report">Generate Report</button>
+            <button class="tab-btn" data-tab="settings">Settings</button>
+        </div>
+
+        <!-- Query Tab -->
+        <div id="query" class="tab-content active">
+            <h2>Ask a Question</h2>
+            
+            <div class="form-group">
+                <label for="department">Department/Role:</label>
+                <select id="department" class="form-control">
+                    <option value="">Loading departments...</option>
+                </select>
             </div>
-            <div class="feature-card">
-                <div class="feature-icon">📄</div>
-                <h4>Document Analysis</h4>
-                <p>Upload and analyze SOPs, job descriptions, and more</p>
+
+            <div class="form-group">
+                <label for="question">Your Question:</label>
+                <textarea id="question" rows="4" class="form-control" 
+                    placeholder="e.g., What are the proper procedures for confined space entry in a wastewater lift station?"></textarea>
             </div>
-            <div class="feature-card">
-                <div class="feature-icon">🎯</div>
-                <h4>Knowledge Gaps</h4>
-                <p>Identify missing information and areas needing detail</p>
-            </div>
-            <div class="feature-card">
-                <div class="feature-icon">📋</div>
-                <h4>SOP Generation</h4>
-                <p>Create structured Standard Operating Procedures</p>
+
+            <button onclick="askQuestion()" class="btn btn-primary">Ask Question</button>
+            <div class="spinner" id="query-spinner"></div>
+
+            <div id="answer-container" style="display:none;">
+                <h3>Answer:</h3>
+                <div id="answer" class="answer-box"></div>
             </div>
         </div>
 
-        <!-- Main Tabs -->
-        <div class="card">
-            <div class="tabs">
-                <button class="tab active" onclick="switchTab('session')">👤 Session</button>
-                <button class="tab" onclick="switchTab('ask')">💬 Ask Questions</button>
-                <button class="tab" onclick="switchTab('analyze')">📄 Analyze Document</button>
-                <button class="tab" onclick="switchTab('settings')">⚙️ Settings</button>
+        <!-- Upload Tab -->
+        <div id="upload" class="tab-content">
+            <h2>Upload Document</h2>
+            
+            <div class="form-group">
+                <label for="upload-department">Department/Role:</label>
+                <select id="upload-department" class="form-control">
+                    <option value="">Loading departments...</option>
+                </select>
             </div>
 
-            <!-- Session Tab -->
-            <div id="sessionTab" class="tab-content active">
-                <div class="alert alert-info" id="sessionAlert"></div>
-                
-                <div id="noSessionView">
-                    <div class="card-header">
-                        <div class="card-icon">👤</div>
-                        <div class="card-title">
-                            <h3>Start New Knowledge Capture Session</h3>
-                            <p>Enter employee information to begin documenting institutional knowledge</p>
-                        </div>
-                    </div>
-
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="employeeName">Employee Name</label>
-                            <input type="text" id="employeeName" placeholder="John Smith" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="department">Department</label>
-                            <input type="text" id="department" placeholder="Public Works">
-                        </div>
-                    </div>
-
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="position">Position/Title</label>
-                            <input type="text" id="position" placeholder="Senior Water Treatment Operator">
-                        </div>
-                        <div class="form-group">
-                            <label for="retirementDate">Retirement Date</label>
-                            <input type="date" id="retirementDate">
-                        </div>
-                    </div>
-
-                    <button class="btn btn-primary btn-full" onclick="createSession()">
-                        <span>Start Session</span>
-                    </button>
-                </div>
-
-                <div id="activeSessionView" style="display: none;">
-                    <div class="card-header">
-                        <div class="card-icon">✓</div>
-                        <div class="card-title">
-                            <h3>Active Session</h3>
-                            <p id="sessionEmployeeName"></p>
-                        </div>
-                    </div>
-
-                    <div class="session-stats">
-                        <div class="stat-card">
-                            <div class="stat-value" id="questionCount">0</div>
-                            <div class="stat-label">Questions Asked</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-value" id="documentCount">0</div>
-                            <div class="stat-label">Documents Analyzed</div>
-                        </div>
-                    </div>
-
-                    <div class="btn-group">
-                        <button class="btn btn-success" onclick="generateReport()">
-                            <span>📥 Download Report</span>
-                        </button>
-                        <button class="btn btn-secondary" onclick="endSession()">
-                            <span>End Session</span>
-                        </button>
-                    </div>
-                </div>
+            <div class="form-group">
+                <label for="file">Select Document:</label>
+                <input type="file" id="file" class="form-control" accept=".txt,.pdf,.doc,.docx">
+                <small>Supported formats: TXT, PDF, DOC, DOCX</small>
             </div>
 
-            <!-- Ask Questions Tab -->
-            <div id="askTab" class="tab-content">
-                <div class="alert alert-error" id="askError"></div>
+            <button onclick="uploadDocument()" class="btn btn-primary">Upload & Analyze</button>
+            <div class="spinner" id="upload-spinner"></div>
 
-                <div class="form-group">
-                    <label for="question">Your Question</label>
-                    <textarea id="question" placeholder="What are the key considerations for water treatment plant maintenance?"></textarea>
-                </div>
-
-                <button class="btn btn-primary btn-full" onclick="askQuestion()" id="askBtn">
-                    <span>Ask PipeWrench AI</span>
-                </button>
-
-                <div class="response-box" id="askResponse">
-                    <div class="response-header">
-                        <h4>✓ Response</h4>
-                    </div>
-                    <div class="response-content" id="askResponseContent"></div>
-                </div>
-            </div>
-
-            <!-- Analyze Document Tab -->
-            <div id="analyzeTab" class="tab-content">
-                <div class="alert alert-error" id="analyzeError"></div>
-
-                <div class="form-group">
-                    <label>Upload Document</label>
-                    <div class="file-upload" onclick="document.getElementById('fileInput').click()">
-                        <input type="file" id="fileInput" accept=".pdf,.docx,.txt" onchange="handleFileSelect(event)">
-                        <div class="file-upload-icon">📁</div>
-                        <div class="file-upload-text">
-                            <strong>Click to upload</strong> or drag and drop<br>
-                            <small>PDF, DOCX, or TXT (Max 10MB)</small>
-                        </div>
-                    </div>
-                    <div id="fileName" class="file-name" style="display: none;"></div>
-                </div>
-
-                <div class="form-group">
-                    <label for="analysisType">Analysis Type</label>
-                    <select id="analysisType">
-                        <option value="generate_questions">🎯 Generate Interview Questions</option>
-                        <option value="identify_gaps">🔍 Identify Knowledge Gaps</option>
-                        <option value="create_sop">📋 Create SOP Draft</option>
-                    </select>
-                </div>
-
-                <button class="btn btn-primary btn-full" onclick="analyzeDocument()" id="analyzeBtn">
-                    <span>Analyze Document</span>
-                </button>
-
-                <div class="response-box" id="analyzeResponse">
-                    <div class="response-header">
-                        <h4>✓ Analysis Results</h4>
-                    </div>
-                    <div class="response-content" id="analyzeResponseContent"></div>
-                </div>
-            </div>
-
-            <!-- Settings Tab -->
-            <div id="settingsTab" class="tab-content">
-                <div class="card-header">
-                    <div class="card-icon">🔑</div>
-                    <div class="card-title">
-                        <h3>API Configuration</h3>
-                        <p>Enter your Anthropic API credentials</p>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label for="apiKey">Anthropic API Key</label>
-                    <input type="password" id="apiKey" placeholder="sk-ant-..." required>
-                    <p style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.5rem;">Your API key is stored locally and never sent to our servers.</p>
-                </div>
-                <input type="hidden" id="model" value="claude-3-5-sonnet-20241022">
+            <div id="upload-result" style="display:none;">
+                <h3>Analysis:</h3>
+                <div id="analysis" class="answer-box"></div>
             </div>
         </div>
-    </div>
 
-    <!-- Footer -->
-    <footer class="footer">
-        <div class="footer-content">
-            <div class="footer-grid">
-                <div class="footer-section">
-                    <h4>About PipeWrench AI</h4>
-                    <p>PipeWrench AI helps organizations preserve critical institutional knowledge through AI-powered document analysis and knowledge capture systems.</p>
-                </div>
-                <div class="footer-section">
-                    <h4>Legal & Compliance</h4>
-                    <ul>
-                        <li><a href="#" onclick="openModal('privacy'); return false;">Privacy Policy</a></li>
-                        <li><a href="#" onclick="openModal('transparency'); return false;">AI Training Data Transparency</a></li>
-                        <li><a href="#" onclick="openModal('terms'); return false;">Terms of Service</a></li>
-                    </ul>
-                </div>
-                <div class="footer-section">
-                    <h4>Contact</h4>
-                    <p>For inquiries and support:</p>
-                    <p><a href="mailto:info@pipewrenchai.com">info@pipewrenchai.com</a></p>
-                </div>
+        <!-- Report Tab -->
+        <div id="report" class="tab-content">
+            <h2>Generate Report</h2>
+            <p style="margin-bottom: 24px; color: var(--text-muted);">
+                Generate a comprehensive report with all questions, answers, and document analyses from this session. 
+                All responses include APA-style citations and references.
+            </p>
+            <button onclick="generateReport()" class="btn btn-primary">Generate Report</button>
+        </div>
+
+        <!-- Settings Tab -->
+        <div id="settings" class="tab-content">
+            <h2>Settings</h2>
+            
+            <div class="form-group">
+                <label for="api-key">Anthropic API Key (Optional):</label>
+                <input type="password" id="api-key" class="form-control" 
+                    placeholder="sk-ant-...">
+                <small>Leave blank to use server default. Your key is stored locally and never sent to our servers except for API calls.</small>
             </div>
-            <div class="footer-bottom">
-                <p>© 2025 PipeWrench AI. All rights reserved. | Compliant with California Generative AI Training Data Transparency Act (Effective January 1, 2026)</p>
+
+            <button onclick="saveSettings()" class="btn btn-primary">Save Settings</button>
+            
+            <div style="margin-top: 32px; padding: 20px; background: var(--bg-dark); border-radius: 8px; border-left: 4px solid var(--accent-orange);">
+                <h4 style="color: var(--accent-orange); margin-bottom: 12px;">About PipeWrench AI</h4>
+                <p style="color: var(--text-muted); line-height: 1.6;">
+                    PipeWrench AI uses Claude 3.5 Sonnet with department-specific prompts to capture and preserve 
+                    institutional knowledge in municipal public works departments. All responses include verifiable 
+                    citations and follow strict anti-hallucination protocols.
+                </p>
             </div>
         </div>
-    </footer>
 
-    <!-- Privacy Policy Modal -->
-    <div id="privacyModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Privacy Policy</h3>
-                <button class="modal-close" onclick="closeModal('privacy')">×</button>
+        <footer>
+            <div class="footer-section">
+                <h4>Privacy Policy</h4>
+                <p>
+                    PipeWrench AI is committed to protecting your privacy. Session data is stored temporarily 
+                    and automatically deleted after 24 hours. API keys are stored locally in your browser and 
+                    never transmitted to our servers except for direct API calls to Anthropic.
+                </p>
             </div>
-            <div class="modal-body">
-                <p><strong>Last Updated:</strong> January 1, 2025</p>
-                
-                <h4>1. Information We Collect</h4>
-                <p>PipeWrench AI operates as a client-side application. Your API keys and documents are processed locally in your browser and are not transmitted to our servers.</p>
-                
-                <h4>2. How We Use Your Information</h4>
-                <p>Your Anthropic API key is used solely to authenticate requests to Anthropic's Claude AI service. Documents you upload are sent directly to Anthropic's API for processing.</p>
-                
-                <h4>3. Data Storage</h4>
-                <p>API keys are stored in your browser's local storage. We do not maintain copies of your API keys or uploaded documents on our servers.</p>
-                
-                <h4>4. Third-Party Services</h4>
-                <p>This application uses Anthropic's Claude AI service. Your data is subject to <a href="https://www.anthropic.com/privacy" target="_blank">Anthropic's Privacy Policy</a>.</p>
-                
-                <h4>5. California Privacy Rights</h4>
-                <p>California residents have specific rights under the California Consumer Privacy Act (CCPA). Since we do not collect or store personal information, these rights are automatically satisfied.</p>
-                
-                <h4>6. Contact Us</h4>
-                <p>For privacy-related questions, contact us at <a href="mailto:privacy@pipewrenchai.com">privacy@pipewrenchai.com</a></p>
-            </div>
-        </div>
-    </div>
 
-    <!-- AI Transparency Modal -->
-    <div id="transparencyModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>AI Training Data Transparency Disclosure</h3>
-                <button class="modal-close" onclick="closeModal('transparency')">×</button>
+            <div class="footer-section">
+                <h4>California Generative AI Training Data Transparency Act</h4>
+                <p>
+                    This application uses Anthropic's Claude AI model. For information about training data used 
+                    in Claude's development, please visit 
+                    <a href="https://www.anthropic.com/legal/data-transparency" target="_blank">Anthropic's Data Transparency page</a>.
+                </p>
+                <p style="margin-top: 12px;">
+                    <strong>Data Usage:</strong> Your questions and uploaded documents are sent to Anthropic's API 
+                    for processing. Anthropic does not train on data submitted via their API. For more information, 
+                    see <a href="https://www.anthropic.com/legal/commercial-terms" target="_blank">Anthropic's Commercial Terms</a>.
+                </p>
             </div>
-            <div class="modal-body">
-                <p><strong>Effective Date:</strong> January 1, 2025</p>
-                <p><strong>Compliance:</strong> California Generative AI Training Data Transparency Act (Effective January 1, 2026)</p>
-                
-                <h4>1. AI System Information</h4>
-                <p>PipeWrench AI utilizes Anthropic's Claude AI models (Claude 3.5 Sonnet) as the underlying generative AI system. This disclosure pertains to the training data used by Anthropic to develop these models.</p>
-                
-                <h4>2. Data Sources and Ownership</h4>
-                <p>The Claude AI models are trained by Anthropic PBC. According to Anthropic's public disclosures:</p>
-                <ul>
-                    <li>Training data includes publicly available information from the internet, licensed datasets, and data provided by users who have consented to its use for training purposes.</li>
-                    <li>Data sources support the system's intended purpose of natural language understanding, generation, and reasoning.</li>
-                    <li>Anthropic maintains detailed documentation of data provenance and licensing.</li>
-                </ul>
-                
-                <h4>3. Dataset Size and Characteristics</h4>
-                <ul>
-                    <li><strong>Size:</strong> Claude models are trained on datasets containing hundreds of billions of tokens of text data.</li>
-                    <li><strong>Data Types:</strong> Text-based data including books, articles, websites, code repositories, and other written content.</li>
-                    <li><strong>Labeling:</strong> Data includes both unlabeled text and human-labeled examples for specific tasks.</li>
-                </ul>
-                
-                <h4>4. Intellectual Property Considerations</h4>
-                <ul>
-                    <li>Training datasets may include copyrighted material used under fair use principles and licensed content.</li>
-                    <li>Anthropic implements filtering to reduce inclusion of copyrighted material where appropriate.</li>
-                    <li>Public domain content is included in training data.</li>
-                    <li>Anthropic respects intellectual property rights and provides mechanisms for rights holders to request content removal.</li>
-                </ul>
-                
-                <h4>5. Data Acquisition</h4>
-                <ul>
-                    <li>Some datasets are licensed from third-party providers.</li>
-                    <li>Publicly available data is collected through web scraping and other automated methods.</li>
-                    <li>User-contributed data is obtained with appropriate consent.</li>
-                </ul>
-                
-                <h4>6. Personal Information</h4>
-                <ul>
-                    <li>Training data may contain personal information that was publicly available on the internet.</li>
-                    <li>Anthropic implements privacy-preserving techniques to minimize retention of personal information.</li>
-                    <li>The system does not intentionally memorize or reproduce personal information from training data.</li>
-                    <li>No aggregate consumer information as defined under California law is knowingly included for the purpose of profiling.</li>
-                </ul>
-                
-                <h4>7. Data Processing and Modifications</h4>
-                <ul>
-                    <li><strong>Cleaning:</strong> Data undergoes filtering to remove low-quality, toxic, or harmful content.</li>
-                    <li><strong>Deduplication:</strong> Duplicate content is identified and removed to improve training efficiency.</li>
-                    <li><strong>Formatting:</strong> Data is processed into formats suitable for model training.</li>
-                    <li><strong>Purpose:</strong> These modifications improve model quality, safety, and performance.</li>
-                </ul>
-                
-                <h4>8. Data Collection Periods</h4>
-                <ul>
-                    <li>Training data was collected over multiple years prior to model training.</li>
-                    <li>Claude 3.5 Sonnet (released October 2024) has a knowledge cutoff of April 2024.</li>
-                    <li>Data collection is ongoing for future model versions.</li>
-                    <li>First used in development: Training data collection began in 2021 for early Claude models.</li>
-                </ul>
-                
-                <h4>9. Synthetic Data</h4>
-                <ul>
-                    <li>Synthetic data generation techniques are used to augment training data.</li>
-                    <li><strong>Functional Need:</strong> Synthetic data helps improve model performance on specific tasks, enhance safety, and fill gaps in naturally occurring data.</li>
-                    <li>Synthetic data is generated using earlier AI models and human oversight.</li>
-                </ul>
-                
-                <h4>10. Exemptions</h4>
-                <p>This system is not exempt under California law. It is not exclusively provided to federal entities for national security purposes, nor is it exclusively provided to hospital medical staff members.</p>
-                
-                <h4>11. Updates and Modifications</h4>
-                <p>This disclosure will be updated when substantial modifications are made to the AI system, including retraining or fine-tuning that materially affects performance. Last substantial modification: October 2024 (Claude 3.5 Sonnet release).</p>
-                
-                <h4>12. Additional Information</h4>
-                <p>For detailed information about Anthropic's training data and practices, please visit:</p>
-                <ul>
-                    <li><a href="https://www.anthropic.com" target="_blank">Anthropic's Official Website</a></li>
-                    <li><a href="https://www.anthropic.com/privacy" target="_blank">Anthropic's Privacy Policy</a></li>
-                </ul>
-                
-                <h4>13. Contact for Data Transparency Inquiries</h4>
-                <p>For questions regarding AI training data transparency, contact: <a href="mailto:transparency@pipewrenchai.com">transparency@pipewrenchai.com</a></p>
-            </div>
-        </div>
-    </div>
 
-    <!-- Terms Modal -->
-    <div id="termsModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Terms of Service</h3>
-                <button class="modal-close" onclick="closeModal('terms')">×</button>
+            <div class="footer-section">
+                <p style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border);">
+                    © 2024 PipeWrench AI. Built for municipal public works professionals.
+                </p>
             </div>
-            <div class="modal-body">
-                <p><strong>Last Updated:</strong> January 1, 2025</p>
-                
-                <h4>1. Acceptance of Terms</h4>
-                <p>By using PipeWrench AI, you agree to these Terms of Service and our Privacy Policy.</p>
-                
-                <h4>2. Use of Service</h4>
-                <p>PipeWrench AI is provided as-is for knowledge preservation purposes. You are responsible for:</p>
-                <ul>
-                    <li>Maintaining the confidentiality of your API keys</li>
-                    <li>Ensuring you have rights to upload and process documents</li>
-                    <li>Complying with Anthropic's Terms of Service</li>
-                    <li>Using the service in accordance with applicable laws</li>
-                </ul>
-                
-                <h4>3. API Key Usage</h4>
-                <p>You must provide your own Anthropic API key. API usage charges are billed directly by Anthropic according to their pricing.</p>
-                
-                <h4>4. Intellectual Property</h4>
-                <p>You retain all rights to documents you upload. Output generated by the AI system is subject to Anthropic's terms regarding AI-generated content.</p>
-                
-                <h4>5. Limitation of Liability</h4>
-                <p>PipeWrench AI is provided without warranties. We are not liable for any damages arising from use of the service.</p>
-                
-                <h4>6. Changes to Terms</h4>
-                <p>We reserve the right to modify these terms at any time. Continued use constitutes acceptance of modified terms.</p>
-                
-                <h4>7. Contact</h4>
-                <p>For questions about these terms, contact: <a href="mailto:legal@pipewrenchai.com">legal@pipewrenchai.com</a></p>
-            </div>
-        </div>
+        </footer>
     </div>
 
     <script>
-        let selectedFile = null;
-        let currentSessionId = null;
+        let sessionId = null;
+        let apiKey = null;
 
-        // Load session from localStorage on page load
-        window.addEventListener('DOMContentLoaded', () => {
-            const savedSessionId = localStorage.getItem('currentSessionId');
-            if (savedSessionId) {
-                currentSessionId = savedSessionId;
-                loadSessionData();
-            }
-            
-            // Load API key from localStorage
-            const savedApiKey = localStorage.getItem('apiKey');
-            if (savedApiKey) {
-                document.getElementById('apiKey').value = savedApiKey;
-            }
+        // Initialize session on page load
+        window.onload = async function() {
+            await createSession();
+            await loadDepartments();
+            loadSettings();
+        };
+
+        // Tab switching
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const tabName = this.dataset.tab;
+                
+                // Update active tab button
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                
+                // Update active tab content
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                document.getElementById(tabName).classList.add('active');
+            });
         });
 
-        function switchTab(tab) {
-            // Update tab buttons
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            event.target.classList.add('active');
-
-            // Update tab content
-            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-            if (tab === 'session') {
-                document.getElementById('sessionTab').classList.add('active');
-            } else if (tab === 'ask') {
-                document.getElementById('askTab').classList.add('active');
-            } else if (tab === 'analyze') {
-                document.getElementById('analyzeTab').classList.add('active');
-            } else if (tab === 'settings') {
-                document.getElementById('settingsTab').classList.add('active');
-            }
-        }
-
         async function createSession() {
-            const employeeName = document.getElementById('employeeName').value;
-            const department = document.getElementById('department').value;
-            const position = document.getElementById('position').value;
-            const retirementDate = document.getElementById('retirementDate').value;
-
-            if (!employeeName) {
-                showAlert('sessionAlert', 'Please enter employee name', 'error');
-                return;
-            }
-
             try {
-                const response = await fetch('/session/create', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        employee_name: employeeName,
-                        department: department,
-                        position: position,
-                        retirement_date: retirementDate
-                    })
+                const response = await fetch('/api/session/create', { method: 'POST' });
+                const data = await response.json();
+                sessionId = data.session_id;
+                console.log('Session created:', sessionId);
+            } catch (error) {
+                console.error('Error creating session:', error);
+                alert('Failed to create session. Please refresh the page.');
+            }
+        }
+
+        async function loadDepartments() {
+            try {
+                const response = await fetch('/api/departments');
+                const data = await response.json();
+                
+                const selects = ['department', 'upload-department'];
+                selects.forEach(selectId => {
+                    const select = document.getElementById(selectId);
+                    select.innerHTML = '<option value="general_public_works">General Public Works</option>';
+                    
+                    data.departments.forEach(dept => {
+                        const option = document.createElement('option');
+                        option.value = dept.value;
+                        option.textContent = dept.name;
+                        select.appendChild(option);
+                    });
                 });
-
-                const data = await response.json();
-
-                if (data.success) {
-                    currentSessionId = data.session_id;
-                    localStorage.setItem('currentSessionId', currentSessionId);
-                    updateSessionUI();
-                    showAlert('sessionAlert', 'Session created successfully!', 'success');
-                } else {
-                    showAlert('sessionAlert', 'Failed to create session', 'error');
-                }
             } catch (error) {
-                showAlert('sessionAlert', 'Network error: ' + error.message, 'error');
-            }
-        }
-
-        async function loadSessionData() {
-            if (!currentSessionId) return;
-
-            try {
-                const response = await fetch(`/session/${currentSessionId}`);
-                const data = await response.json();
-
-                if (data.success) {
-                    updateSessionUI(data.session);
-                }
-            } catch (error) {
-                console.error('Error loading session:', error);
-            }
-        }
-
-        function updateSessionUI(sessionData = null) {
-            document.getElementById('noSessionView').style.display = 'none';
-            document.getElementById('activeSessionView').style.display = 'block';
-            
-            const badge = document.getElementById('sessionBadge');
-            badge.textContent = 'Active Session';
-            badge.classList.add('active');
-
-            if (sessionData) {
-                const metadata = sessionData.metadata || {};
-                document.getElementById('sessionEmployeeName').textContent = 
-                    `${metadata.employee_name || 'Unknown'} - ${metadata.position || 'Unknown Position'}`;
-                document.getElementById('questionCount').textContent = sessionData.questions?.length || 0;
-                document.getElementById('documentCount').textContent = sessionData.documents?.length || 0;
-            }
-        }
-
-        function endSession() {
-            if (confirm('Are you sure you want to end this session? Make sure to download the report first.')) {
-                currentSessionId = null;
-                localStorage.removeItem('currentSessionId');
-                
-                document.getElementById('noSessionView').style.display = 'block';
-                document.getElementById('activeSessionView').style.display = 'none';
-                
-                const badge = document.getElementById('sessionBadge');
-                badge.textContent = 'No Active Session';
-                badge.classList.remove('active');
-                
-                // Clear form
-                document.getElementById('employeeName').value = '';
-                document.getElementById('department').value = '';
-                document.getElementById('position').value = '';
-                document.getElementById('retirementDate').value = '';
-            }
-        }
-
-        function generateReport() {
-            if (!currentSessionId) {
-                alert('No active session');
-                return;
-            }
-            
-            window.open(`/report/${currentSessionId}`, '_blank');
-        }
-
-        function handleFileSelect(event) {
-            const file = event.target.files[0];
-            if (file) {
-                selectedFile = file;
-                const fileNameDiv = document.getElementById('fileName');
-                fileNameDiv.textContent = `✓ ${file.name}`;
-                fileNameDiv.style.display = 'block';
-            }
-        }
-
-        function showError(elementId, message) {
-            const errorEl = document.getElementById(elementId);
-            errorEl.textContent = message;
-            errorEl.classList.add('show');
-            setTimeout(() => errorEl.classList.remove('show'), 5000);
-        }
-
-        function showAlert(elementId, message, type) {
-            const alertEl = document.getElementById(elementId);
-            alertEl.textContent = message;
-            alertEl.className = `alert alert-${type} show`;
-            setTimeout(() => alertEl.classList.remove('show'), 5000);
-        }
-
-        function showResponse(responseId, contentId, content) {
-            const responseBox = document.getElementById(responseId);
-            const contentEl = document.getElementById(contentId);
-            contentEl.textContent = content;
-            responseBox.classList.add('show');
-        }
-
-        function openModal(type) {
-            const modalId = type + 'Modal';
-            document.getElementById(modalId).classList.add('show');
-        }
-
-        function closeModal(type) {
-            const modalId = type + 'Modal';
-            document.getElementById(modalId).classList.remove('show');
-        }
-
-        // Close modal when clicking outside
-        window.onclick = function(event) {
-            if (event.target.classList.contains('modal')) {
-                event.target.classList.remove('show');
+                console.error('Error loading departments:', error);
             }
         }
 
         async function askQuestion() {
-            const apiKey = document.getElementById('apiKey').value;
-            const question = document.getElementById('question').value;
-            const model = document.getElementById('model').value;
-            const btn = document.getElementById('askBtn');
-
-            if (!apiKey) {
-                showError('askError', 'Please enter your Anthropic API key in Settings');
-                return;
-            }
-
+            const question = document.getElementById('question').value.trim();
+            const department = document.getElementById('department').value;
+            
             if (!question) {
-                showError('askError', 'Please enter a question');
+                alert('Please enter a question');
                 return;
             }
 
-            // Save API key to localStorage
-            localStorage.setItem('apiKey', apiKey);
+            const spinner = document.getElementById('query-spinner');
+            spinner.style.display = 'block';
+            document.getElementById('answer-container').style.display = 'none';
 
-            // Show loading state
-            btn.disabled = true;
-            btn.innerHTML = '<span class="spinner"></span><span>Processing...</span>';
-            document.getElementById('askResponse').classList.remove('show');
+            const formData = new FormData();
+            formData.append('question', question);
+            formData.append('department', department);
+            formData.append('session_id', sessionId);
+            if (apiKey) formData.append('api_key', apiKey);
 
             try {
-                const response = await fetch('/query', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        api_key: apiKey,
-                        question: question,
-                        model: model,
-                        session_id: currentSessionId
-                    })
-                });
-
-                const data = await response.json();
-
-                if (data.success) {
-                    showResponse('askResponse', 'askResponseContent', data.response);
-                    
-                    // Update session stats if active
-                    if (currentSessionId) {
-                        loadSessionData();
-                    }
-                } else {
-                    showError('askError', data.error || 'An error occurred');
-                }
-            } catch (error) {
-                showError('askError', 'Network error: ' + error.message);
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = '<span>Ask PipeWrench AI</span>';
-            }
-        }
-
-        async function analyzeDocument() {
-            const apiKey = document.getElementById('apiKey').value;
-            const analysisType = document.getElementById('analysisType').value;
-            const model = document.getElementById('model').value;
-            const btn = document.getElementById('analyzeBtn');
-
-            if (!apiKey) {
-                showError('analyzeError', 'Please enter your Anthropic API key in Settings');
-                return;
-            }
-
-            if (!selectedFile) {
-                showError('analyzeError', 'Please select a file to analyze');
-                return;
-            }
-
-            // Save API key to localStorage
-            localStorage.setItem('apiKey', apiKey);
-
-            // Show loading state
-            btn.disabled = true;
-            btn.innerHTML = '<span class="spinner"></span><span>Analyzing...</span>';
-            document.getElementById('analyzeResponse').classList.remove('show');
-
-            try {
-                const formData = new FormData();
-                formData.append('api_key', apiKey);
-                formData.append('file', selectedFile);
-                formData.append('analysis_type', analysisType);
-                formData.append('model', model);
-                if (currentSessionId) {
-                    formData.append('session_id', currentSessionId);
-                }
-
-                const response = await fetch('/analyze-document', {
+                const response = await fetch('/api/query', {
                     method: 'POST',
                     body: formData
                 });
-
-                const data = await response.json();
-
-                if (data.success) {
-                    showResponse('analyzeResponse', 'analyzeResponseContent', data.response);
-                    
-                    // Update session stats if active
-                    if (currentSessionId) {
-                        loadSessionData();
-                    }
-                } else {
-                    showError('analyzeError', data.error || 'An error occurred');
+                
+                if (!response.ok) {
+                    throw new Error('API request failed');
                 }
+                
+                const data = await response.json();
+                
+                document.getElementById('answer').innerHTML = data.answer.replace(/\n/g, '<br>');
+                document.getElementById('answer-container').style.display = 'block';
             } catch (error) {
-                showError('analyzeError', 'Network error: ' + error.message);
+                alert('Error: ' + error.message);
             } finally {
-                btn.disabled = false;
-                btn.innerHTML = '<span>Analyze Document</span>';
+                spinner.style.display = 'none';
             }
         }
 
-        // Allow Enter key to submit in question textarea
+        async function uploadDocument() {
+            const fileInput = document.getElementById('file');
+            const department = document.getElementById('upload-department').value;
+            
+            if (!fileInput.files[0]) {
+                alert('Please select a file');
+                return;
+            }
+
+            const spinner = document.getElementById('upload-spinner');
+            spinner.style.display = 'block';
+            document.getElementById('upload-result').style.display = 'none';
+
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            formData.append('department', department);
+            formData.append('session_id', sessionId);
+            if (apiKey) formData.append('api_key', apiKey);
+
+            try {
+                const response = await fetch('/api/document/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Upload failed');
+                }
+                
+                const data = await response.json();
+                
+                document.getElementById('analysis').innerHTML = data.analysis.replace(/\n/g, '<br>');
+                document.getElementById('upload-result').style.display = 'block';
+            } catch (error) {
+                alert('Error: ' + error.message);
+            } finally {
+                spinner.style.display = 'none';
+            }
+        }
+
+        async function generateReport() {
+            const formData = new FormData();
+            formData.append('session_id', sessionId);
+
+            try {
+                const response = await fetch('/api/report/generate', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Report generation failed');
+                }
+                
+                const html = await response.text();
+                
+                // Open report in new window
+                const reportWindow = window.open('', '_blank');
+                reportWindow.document.write(html);
+                reportWindow.document.close();
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        function saveSettings() {
+            apiKey = document.getElementById('api-key').value.trim();
+            if (apiKey) {
+                localStorage.setItem('anthropic_api_key', apiKey);
+                alert('Settings saved! Your API key is stored locally in your browser.');
+            } else {
+                localStorage.removeItem('anthropic_api_key');
+                alert('API key cleared. Using server default.');
+            }
+        }
+
+        function loadSettings() {
+            const savedKey = localStorage.getItem('anthropic_api_key');
+            if (savedKey) {
+                apiKey = savedKey;
+                document.getElementById('api-key').value = savedKey;
+            }
+        }
+
+        // Allow Enter key to submit question
         document.getElementById('question').addEventListener('keydown', function(e) {
             if (e.key === 'Enter' && e.ctrlKey) {
                 askQuestion();
