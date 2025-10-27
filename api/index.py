@@ -9,7 +9,7 @@ from typing import Optional, List
 import uuid
 
 # Import department prompts
-from department_prompts import get_department_prompt, get_department_list, get_department_name
+from .department_prompts import get_department_prompt, get_department_list, get_department_name
 
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
