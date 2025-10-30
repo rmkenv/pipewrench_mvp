@@ -1,240 +1,235 @@
 """
-Job Roles Configuration for Municipal DPW Knowledge Capture System
-Defines role-specific focus areas and expertise domains
+Job Role Definitions for Municipal DPW Personnel
+Used to tailor AI responses to specific user roles and experience levels
 """
 
 JOB_ROLES = {
-    "project_manager": {
-        "title": "Project Manager",
+    "operator_trainee": {
+        "title": "Operator Trainee / New Hire",
+        "experience_level": "entry",
         "focus_areas": [
-            "project scheduling",
-            "budget management",
-            "stakeholder coordination",
-            "risk management",
-            "contract administration",
-            "resource allocation",
-            "quality control",
-            "project documentation"
-        ],
-        "key_responsibilities": [
-            "Overall project oversight",
-            "Timeline and milestone tracking",
-            "Budget monitoring and reporting",
-            "Team coordination"
+            "Basic safety procedures",
+            "Fundamental operational concepts",
+            "Standard operating procedures (SOPs)",
+            "Equipment familiarization",
+            "Regulatory basics",
+            "Mentorship and training resources"
         ]
     },
-
-    "civil_engineer": {
-        "title": "Civil Engineer",
+    
+    "operator_1": {
+        "title": "Operator I / Technician I",
+        "experience_level": "junior",
         "focus_areas": [
-            "structural design",
-            "technical specifications",
-            "engineering calculations",
-            "design standards compliance",
-            "material specifications",
-            "load analysis",
-            "drainage design",
-            "geotechnical considerations"
-        ],
-        "key_responsibilities": [
-            "Design review and approval",
-            "Technical specification development",
-            "Engineering analysis",
-            "Code compliance verification"
+            "Routine operations and maintenance",
+            "Basic troubleshooting",
+            "Safety compliance",
+            "Documentation and record-keeping",
+            "Equipment operation",
+            "Standard procedures"
         ]
     },
-
-    "construction_inspector": {
-        "title": "Construction Inspector",
+    
+    "operator_2": {
+        "title": "Operator II / Technician II",
+        "experience_level": "intermediate",
         "focus_areas": [
-            "field inspection",
-            "quality assurance",
-            "construction compliance",
-            "material testing",
-            "workmanship standards",
-            "safety compliance",
-            "daily reporting",
-            "deficiency identification"
-        ],
-        "key_responsibilities": [
-            "On-site inspection activities",
-            "Compliance verification",
-            "Documentation of work progress",
-            "Issue identification and reporting"
+            "Advanced operations",
+            "Process optimization",
+            "Intermediate troubleshooting",
+            "Preventive maintenance",
+            "Training junior staff",
+            "Regulatory compliance"
         ]
     },
-
+    
+    "operator_3": {
+        "title": "Operator III / Senior Technician",
+        "experience_level": "senior",
+        "focus_areas": [
+            "Complex troubleshooting",
+            "Process control and optimization",
+            "Emergency response",
+            "Mentoring and training",
+            "Regulatory reporting",
+            "System improvements"
+        ]
+    },
+    
+    "lead_operator": {
+        "title": "Lead Operator / Crew Leader",
+        "experience_level": "lead",
+        "focus_areas": [
+            "Crew supervision",
+            "Work planning and scheduling",
+            "Quality control",
+            "Safety oversight",
+            "Performance management",
+            "Resource allocation"
+        ]
+    },
+    
+    "supervisor": {
+        "title": "Supervisor / Foreman",
+        "experience_level": "supervisory",
+        "focus_areas": [
+            "Team management",
+            "Budget oversight",
+            "Project coordination",
+            "Performance evaluation",
+            "Policy implementation",
+            "Interdepartmental coordination"
+        ]
+    },
+    
+    "manager": {
+        "title": "Manager / Superintendent",
+        "experience_level": "management",
+        "focus_areas": [
+            "Strategic planning",
+            "Budget development",
+            "Policy development",
+            "Regulatory compliance oversight",
+            "Stakeholder communication",
+            "Long-term asset management"
+        ]
+    },
+    
+    "director": {
+        "title": "Director / Department Head",
+        "experience_level": "executive",
+        "focus_areas": [
+            "Strategic vision",
+            "Political liaison",
+            "Budget and finance",
+            "Policy and governance",
+            "Public relations",
+            "Organizational development"
+        ]
+    },
+    
+    "engineer": {
+        "title": "Engineer",
+        "experience_level": "professional",
+        "focus_areas": [
+            "Design and specifications",
+            "Technical analysis",
+            "Regulatory compliance",
+            "Project management",
+            "Quality assurance",
+            "Innovation and improvement"
+        ]
+    },
+    
     "safety_officer": {
-        "title": "Safety Officer",
+        "title": "Safety Officer / Compliance Coordinator",
+        "experience_level": "professional",
         "focus_areas": [
-            "OSHA compliance",
-            "safety regulations",
-            "hazard identification",
-            "safety training",
-            "incident investigation",
-            "PPE requirements",
-            "safety protocols",
-            "emergency procedures"
-        ],
-        "key_responsibilities": [
-            "Safety program implementation",
-            "Site safety inspections",
-            "Safety training coordination",
-            "Incident response and reporting"
+            "Safety program development",
+            "Incident investigation",
+            "Training coordination",
+            "Regulatory compliance",
+            "Risk assessment",
+            "Emergency preparedness"
         ]
     },
-
-    "environmental_specialist": {
-        "title": "Environmental Specialist",
+    
+    "maintenance_tech": {
+        "title": "Maintenance Technician",
+        "experience_level": "intermediate",
         "focus_areas": [
-            "EPA regulations",
-            "environmental permits",
-            "stormwater management",
-            "erosion control",
-            "wetlands protection",
-            "environmental impact assessment",
-            "pollution prevention",
-            "environmental monitoring"
-        ],
-        "key_responsibilities": [
-            "Environmental compliance oversight",
-            "Permit acquisition and management",
-            "Environmental monitoring",
-            "Regulatory reporting"
+            "Equipment repair",
+            "Preventive maintenance",
+            "Troubleshooting",
+            "Parts management",
+            "Documentation",
+            "Safety procedures"
         ]
     },
-
-    "procurement_specialist": {
-        "title": "Procurement Specialist",
+    
+    "electrician": {
+        "title": "Electrician / Instrumentation Tech",
+        "experience_level": "professional",
         "focus_areas": [
-            "FAR compliance",
-            "contract procurement",
-            "vendor selection",
-            "bid evaluation",
-            "contract negotiation",
-            "procurement regulations",
-            "competitive bidding",
-            "contract types"
-        ],
-        "key_responsibilities": [
-            "Procurement process management",
-            "Contract document preparation",
-            "Vendor evaluation",
-            "Compliance with procurement regulations"
+            "Electrical systems",
+            "Motor controls",
+            "SCADA and instrumentation",
+            "PLC programming",
+            "Troubleshooting",
+            "NEC compliance"
         ]
     },
-
-    "maintenance_supervisor": {
-        "title": "Maintenance Supervisor",
+    
+    "mechanic": {
+        "title": "Mechanic / Fleet Technician",
+        "experience_level": "professional",
         "focus_areas": [
-            "preventive maintenance",
-            "equipment management",
-            "maintenance scheduling",
-            "repair procedures",
-            "asset management",
-            "maintenance standards",
-            "work order management",
-            "maintenance documentation"
-        ],
-        "key_responsibilities": [
-            "Maintenance program oversight",
-            "Work crew supervision",
-            "Equipment and asset tracking",
-            "Maintenance planning"
+            "Vehicle and equipment repair",
+            "Diagnostics",
+            "Preventive maintenance",
+            "Hydraulic systems",
+            "Diesel engines",
+            "Welding and fabrication"
         ]
     },
-
-    "traffic_engineer": {
-        "title": "Traffic Engineer",
+    
+    "lab_tech": {
+        "title": "Laboratory Technician",
+        "experience_level": "professional",
         "focus_areas": [
-            "traffic control",
-            "signalization",
-            "traffic flow analysis",
-            "roadway design",
-            "traffic safety",
-            "MUTCD compliance",
-            "traffic studies",
-            "intersection design"
-        ],
-        "key_responsibilities": [
-            "Traffic control plan development",
-            "Traffic signal design",
-            "Traffic impact analysis",
-            "Safety improvement recommendations"
+            "Sample collection and analysis",
+            "QA/QC procedures",
+            "Laboratory equipment",
+            "Data management",
+            "Regulatory reporting",
+            "Safety protocols"
         ]
     },
-
-    "gis_specialist": {
-        "title": "GIS Specialist",
+    
+    "admin_staff": {
+        "title": "Administrative Staff",
+        "experience_level": "support",
         "focus_areas": [
-            "spatial analysis",
-            "mapping",
-            "asset inventory",
-            "data management",
-            "GPS coordination",
-            "infrastructure mapping",
-            "data visualization",
-            "geospatial databases"
-        ],
-        "key_responsibilities": [
-            "GIS data management",
-            "Map production",
-            "Spatial analysis",
-            "Asset location tracking"
-        ]
-    },
-
-    "public_works_director": {
-        "title": "Public Works Director",
-        "focus_areas": [
-            "strategic planning",
-            "policy development",
-            "budget oversight",
-            "regulatory compliance",
-            "public relations",
-            "departmental management",
-            "capital improvement planning",
-            "interagency coordination"
-        ],
-        "key_responsibilities": [
-            "Department leadership",
-            "Strategic decision-making",
-            "Budget and resource allocation",
-            "Policy implementation"
+            "Customer service",
+            "Billing and accounts",
+            "Record management",
+            "Communication",
+            "Scheduling",
+            "Regulatory reporting support"
         ]
     }
 }
 
-def get_role_info(role_key):
+def get_all_roles() -> list:
     """
-    Retrieve information for a specific job role
-
-    Args:
-        role_key (str): The role identifier key
-
+    Get list of all role keys
+    
     Returns:
-        dict: Role information or None if not found
-    """
-    return JOB_ROLES.get(role_key)
-
-def get_all_roles():
-    """
-    Get list of all available role keys
-
-    Returns:
-        list: List of role identifier keys
+        List of role key strings
     """
     return list(JOB_ROLES.keys())
 
-def get_role_focus_areas(role_key):
+def get_role_info(role_key: str) -> dict:
+    """
+    Get complete information for a specific role
+    
+    Args:
+        role_key: Key from JOB_ROLES
+        
+    Returns:
+        Role dictionary or empty dict if not found
+    """
+    return JOB_ROLES.get(role_key, {})
+
+def get_role_focus_areas(role_key: str) -> list:
     """
     Get focus areas for a specific role
-
+    
     Args:
-        role_key (str): The role identifier key
-
+        role_key: Key from JOB_ROLES
+        
     Returns:
-        list: List of focus areas or empty list if role not found
+        List of focus area strings
     """
-    role = JOB_ROLES.get(role_key)
-    return role.get("focus_areas", []) if role else []
+    role = JOB_ROLES.get(role_key, {})
+    return role.get("focus_areas", [])
