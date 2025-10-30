@@ -720,271 +720,380 @@ HTML_TEMPLATE = """
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DPW Knowledge Capture System</title>
     <style>
+        :root {
+            --primary-color: #2563eb;
+            --primary-dark: #1e40af;
+            --secondary-color: #64748b;
+            --success-color: #10b981;
+            --error-color: #ef4444;
+            --warning-color: #f59e0b;
+            --bg-light: #f8fafc;
+            --bg-white: #ffffff;
+            --text-dark: #1e293b;
+            --text-light: #64748b;
+            --border-color: #e2e8f0;
+        }
+
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
-        
+
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: var(--bg-light);
+            color: var(--text-dark);
+            line-height: 1.6;
         }
-        
+
         .container {
             max-width: 1200px;
             margin: 0 auto;
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            overflow: hidden;
+            padding: 2rem;
         }
-        
+
         .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            text-align: center;
+            margin-bottom: 3rem;
+            padding: 2rem;
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+            border-radius: 1rem;
             color: white;
-            padding: 30px;
-            text-align: center;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
-        
+
         .header h1 {
-            font-size: 2.5em;
-            margin-bottom: 10px;
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
         }
-        
+
         .header p {
-            font-size: 1.1em;
-            opacity: 0.9;
+            font-size: 1.125rem;
+            opacity: 0.95;
         }
-        
-        .content {
-            padding: 30px;
+
+        .card {
+            background: var(--bg-white);
+            border-radius: 0.75rem;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            border: 1px solid var(--border-color);
         }
-        
-        .section {
-            margin-bottom: 30px;
+
+        .card-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--text-dark);
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
         }
-        
-        .section-title {
-            font-size: 1.5em;
-            color: #667eea;
-            margin-bottom: 15px;
-            padding-bottom: 10px;
-            border-bottom: 2px solid #667eea;
-        }
-        
-        .upload-area {
-            border: 3px dashed #667eea;
-            border-radius: 10px;
-            padding: 40px;
+
+        .upload-zone {
+            border: 2px dashed var(--border-color);
+            border-radius: 0.75rem;
+            padding: 3rem;
             text-align: center;
-            background: #f8f9ff;
+            background: var(--bg-light);
             cursor: pointer;
-            transition: all 0.3s;
+            transition: all 0.3s ease;
         }
-        
-        .upload-area:hover {
-            background: #e8ebff;
-            border-color: #764ba2;
+
+        .upload-zone:hover {
+            border-color: var(--primary-color);
+            background: #eff6ff;
         }
-        
-        .upload-area.dragover {
-            background: #d8dbff;
-            border-color: #764ba2;
+
+        .upload-zone.dragover {
+            border-color: var(--primary-color);
+            background: #dbeafe;
         }
-        
+
+        .upload-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .upload-text {
+            font-size: 1.125rem;
+            color: var(--text-dark);
+            margin-bottom: 0.5rem;
+        }
+
+        .upload-hint {
+            font-size: 0.875rem;
+            color: var(--text-light);
+        }
+
         input[type="file"] {
             display: none;
         }
-        
+
         .btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: inline-block;
+            padding: 0.75rem 1.5rem;
+            background: var(--primary-color);
             color: white;
             border: none;
-            padding: 12px 30px;
-            border-radius: 25px;
-            font-size: 1em;
+            border-radius: 0.5rem;
+            font-size: 1rem;
+            font-weight: 500;
             cursor: pointer;
-            transition: transform 0.2s;
+            transition: all 0.2s ease;
         }
-        
+
         .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+            background: var(--primary-dark);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 6px rgba(37, 99, 235, 0.2);
         }
-        
+
         .btn:disabled {
             opacity: 0.5;
             cursor: not-allowed;
+            transform: none;
         }
-        
+
+        .btn-secondary {
+            background: var(--secondary-color);
+        }
+
+        .btn-secondary:hover {
+            background: #475569;
+        }
+
+        .btn-small {
+            padding: 0.5rem 1rem;
+            font-size: 0.875rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-label {
+            display: block;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+            color: var(--text-dark);
+        }
+
         select, input[type="text"] {
             width: 100%;
-            padding: 12px;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
-            font-size: 1em;
-            margin-bottom: 15px;
-            transition: border-color 0.3s;
+            padding: 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+            font-size: 1rem;
+            transition: all 0.2s ease;
         }
-        
+
         select:focus, input[type="text"]:focus {
             outline: none;
-            border-color: #667eea;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
         }
-        
-        .query-area {
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1.5rem;
+        }
+
+        .query-container {
             display: flex;
-            gap: 10px;
-            margin-top: 15px;
+            gap: 1rem;
+            margin-top: 1rem;
         }
-        
+
         .query-input {
             flex: 1;
-            padding: 15px;
-            border: 2px solid #e0e0e0;
-            border-radius: 25px;
-            font-size: 1em;
+            padding: 0.75rem 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+            font-size: 1rem;
         }
-        
-        .response-area {
-            background: #f8f9ff;
-            border-radius: 10px;
-            padding: 20px;
+
+        .response-box {
+            background: var(--bg-light);
+            border: 1px solid var(--border-color);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
             min-height: 200px;
-            margin-top: 20px;
             white-space: pre-wrap;
-            line-height: 1.6;
+            font-size: 0.9375rem;
+            line-height: 1.7;
         }
-        
-        .status {
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 15px;
+
+        .alert {
+            padding: 1rem 1.25rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1.5rem;
             display: none;
+            font-size: 0.9375rem;
         }
-        
-        .status.success {
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
+
+        .alert.show {
+            display: block;
         }
-        
-        .status.error {
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
+
+        .alert-success {
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #6ee7b7;
         }
-        
-        .status.info {
-            background: #d1ecf1;
-            color: #0c5460;
-            border: 1px solid #bee5eb;
+
+        .alert-error {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fca5a5;
         }
-        
-        .grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
+
+        .alert-info {
+            background: #dbeafe;
+            color: #1e40af;
+            border: 1px solid #93c5fd;
         }
-        
-        .footer {
-            background: #f8f9ff;
-            padding: 20px 30px;
-            border-top: 2px solid #e0e0e0;
-            font-size: 0.9em;
-            color: #666;
+
+        .custom-url-box {
+            background: #fffbeb;
+            border: 1px solid #fcd34d;
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            margin-top: 1.5rem;
         }
-        
-        .footer-title {
-            font-weight: bold;
-            color: #667eea;
-            margin-bottom: 10px;
-            cursor: pointer;
+
+        .custom-url-box h4 {
+            color: #92400e;
+            margin-bottom: 0.5rem;
+            font-size: 1.125rem;
+        }
+
+        .custom-url-box p {
+            color: #78350f;
+            font-size: 0.875rem;
+            margin-bottom: 1rem;
+        }
+
+        .url-input-group {
             display: flex;
-            align-items: center;
-            gap: 10px;
+            gap: 0.75rem;
         }
-        
+
+        .url-list {
+            margin-top: 1rem;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .url-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem;
+            background: white;
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+            margin-bottom: 0.5rem;
+            font-size: 0.875rem;
+        }
+
+        .btn-remove {
+            padding: 0.375rem 0.75rem;
+            background: var(--error-color);
+            color: white;
+            border: none;
+            border-radius: 0.375rem;
+            font-size: 0.8125rem;
+            cursor: pointer;
+        }
+
+        .btn-remove:hover {
+            background: #dc2626;
+        }
+
+        .footer {
+            background: var(--bg-white);
+            border: 1px solid var(--border-color);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            margin-top: 2rem;
+        }
+
+        .footer-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .footer-title {
+            font-weight: 600;
+            color: var(--primary-color);
+            font-size: 1rem;
+        }
+
+        .footer-arrow {
+            transition: transform 0.3s ease;
+        }
+
+        .footer-arrow.expanded {
+            transform: rotate(180deg);
+        }
+
         .footer-content {
             max-height: 0;
             overflow: hidden;
             transition: max-height 0.3s ease;
         }
-        
-        .footer-content.expanded {
-            max-height: 500px;
+
+        .footer-content.show {
+            max-height: 600px;
             overflow-y: auto;
+            margin-top: 1rem;
         }
-        
-        .source-list {
-            columns: 2;
-            column-gap: 20px;
-            margin-top: 10px;
+
+        .source-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.5rem;
+            margin-top: 1rem;
         }
-        
-        .source-item {
-            break-inside: avoid;
-            margin-bottom: 8px;
-            font-size: 0.85em;
-        }
-        
-        .source-item a {
-            color: #667eea;
+
+        .source-link {
+            font-size: 0.875rem;
+            color: var(--primary-color);
             text-decoration: none;
+            padding: 0.25rem 0;
         }
-        
-        .source-item a:hover {
+
+        .source-link:hover {
             text-decoration: underline;
         }
-        
-        .custom-url-section {
-            background: #fff9e6;
-            border: 2px solid #ffd700;
-            border-radius: 10px;
-            padding: 20px;
-            margin-top: 20px;
-        }
-        
-        .custom-url-list {
-            margin-top: 15px;
-            max-height: 200px;
-            overflow-y: auto;
-        }
-        
-        .custom-url-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 8px;
-            background: white;
-            border-radius: 5px;
-            margin-bottom: 5px;
-        }
-        
-        .remove-btn {
-            background: #dc3545;
-            color: white;
-            border: none;
-            padding: 5px 15px;
-            border-radius: 15px;
-            cursor: pointer;
-            font-size: 0.9em;
-        }
-        
-        .remove-btn:hover {
-            background: #c82333;
-        }
-        
+
         @media (max-width: 768px) {
-            .grid {
+            .container {
+                padding: 1rem;
+            }
+
+            .header h1 {
+                font-size: 1.75rem;
+            }
+
+            .grid-2 {
                 grid-template-columns: 1fr;
             }
-            
-            .source-list {
-                columns: 1;
+
+            .source-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .query-container {
+                flex-direction: column;
             }
         }
     </style>
@@ -995,118 +1104,111 @@ HTML_TEMPLATE = """
             <h1>🏗️ DPW Knowledge Capture System</h1>
             <p>AI-Powered Municipal Infrastructure Knowledge Base</p>
         </div>
-        
-        <div class="content">
-            <div id="status" class="status"></div>
+
+        <div id="alertBox" class="alert"></div>
+
+        <!-- Upload Section -->
+        <div class="card">
+            <h2 class="card-title">📄 Step 1: Upload Your Document</h2>
+            <div class="upload-zone" id="uploadZone">
+                <div class="upload-icon">📁</div>
+                <div class="upload-text">Drag & drop your PDF here</div>
+                <div class="upload-hint">or click to browse</div>
+                <input type="file" id="fileInput" accept=".pdf" onchange="handleFileSelect(event)">
+            </div>
+        </div>
+
+        <!-- Query Section -->
+        <div class="card" id="querySection" style="display: none;">
+            <h2 class="card-title">⚙️ Step 2: Configure Your Query</h2>
             
-            <!-- Step 1: Upload Document -->
-            <div class="section">
-                <h2 class="section-title">📄 Step 1: Upload Your Document</h2>
-                <div class="upload-area" id="uploadArea">
-                    <p style="font-size: 3em; margin-bottom: 10px;">📁</p>
-                    <p style="font-size: 1.2em; margin-bottom: 10px;">Drag & Drop PDF Here</p>
-                    <p style="color: #666; margin-bottom: 15px;">or</p>
-                    <button class="btn" onclick="document.getElementById('fileInput').click()">
-                        Choose File
-                    </button>
-                    <input type="file" id="fileInput" accept=".pdf" onchange="handleFileSelect(event)">
+            <div class="grid-2">
+                <div class="form-group">
+                    <label class="form-label">Your Role</label>
+                    <select id="roleSelect"></select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Department (Optional)</label>
+                    <select id="departmentSelect">
+                        <option value="">Select Department</option>
+                    </select>
                 </div>
             </div>
-            
-            <!-- Step 2: Configure Query -->
-            <div class="section" id="querySection" style="display: none;">
-                <h2 class="section-title">⚙️ Step 2: Configure Your Query</h2>
-                
-                <div class="grid">
-                    <div>
-                        <label><strong>Your Role:</strong></label>
-                        <select id="roleSelect">
-                            <option value="general">General DPW Staff</option>
-                        </select>
-                    </div>
-                    
-                    <div>
-                        <label><strong>Department:</strong></label>
-                        <select id="departmentSelect">
-                            <option value="">Select Department (Optional)</option>
-                        </select>
-                    </div>
+
+            <!-- Custom URLs -->
+            <div class="custom-url-box">
+                <h4>🔗 Add Your Organization's URLs</h4>
+                <p>Add additional trusted sources specific to your organization</p>
+                <div class="url-input-group">
+                    <input type="text" id="customUrlInput" placeholder="https://your-organization.com/resource">
+                    <button class="btn btn-small" onclick="addCustomUrl()">Add URL</button>
                 </div>
-                
-                <!-- Custom URL Section -->
-                <div class="custom-url-section">
-                    <h3 style="color: #ff8c00; margin-bottom: 10px;">🔗 Add Your Organization's URLs</h3>
-                    <p style="font-size: 0.9em; color: #666; margin-bottom: 15px;">
-                        Add additional trusted sources specific to your organization
-                    </p>
-                    <div style="display: flex; gap: 10px;">
-                        <input type="text" id="customUrlInput" placeholder="https://your-organization.com/resource" 
-                               style="margin-bottom: 0;">
-                        <button class="btn" onclick="addCustomUrl()">Add URL</button>
-                    </div>
-                    <div id="customUrlList" class="custom-url-list"></div>
-                </div>
-                
-                <div class="query-area">
+                <div id="customUrlList" class="url-list"></div>
+            </div>
+
+            <div class="form-group" style="margin-top: 1.5rem;">
+                <label class="form-label">Your Question</label>
+                <div class="query-container">
                     <input type="text" id="queryInput" class="query-input" 
                            placeholder="Ask a question about your document..." 
                            onkeypress="handleQueryKeyPress(event)">
                     <button class="btn" onclick="submitQuery()">Ask Question</button>
                 </div>
             </div>
-            
-            <!-- Step 3: Response -->
-            <div class="section" id="responseSection" style="display: none;">
-                <h2 class="section-title">💡 Response</h2>
-                <div id="responseArea" class="response-area">
-                    Your answer will appear here...
-                </div>
+        </div>
+
+        <!-- Response Section -->
+        <div class="card" id="responseSection" style="display: none;">
+            <h2 class="card-title">💡 Response</h2>
+            <div id="responseBox" class="response-box">
+                Your answer will appear here...
             </div>
         </div>
-        
+
+        <!-- Footer -->
         <div class="footer">
-            <div class="footer-title" onclick="toggleFooter()">
-                📚 Federal Whitelisted Sources (24 sources) 
-                <span id="footerArrow">▼</span>
+            <div class="footer-header" onclick="toggleFooter()">
+                <span class="footer-title">📚 Federal Whitelisted Sources (24 sources)</span>
+                <span id="footerArrow" class="footer-arrow">▼</span>
             </div>
             <div id="footerContent" class="footer-content">
-                <div class="source-list">
-                    <div class="source-item">• <a href="https://www.acquisition.gov/far/part-36" target="_blank">FAR Part 36</a></div>
-                    <div class="source-item">• <a href="https://highways.dot.gov/federal-lands/specs" target="_blank">FHWA Standards</a></div>
-                    <div class="source-item">• <a href="https://www.osha.gov/laws-regs/regulations/standardnumber/1926" target="_blank">OSHA 29 CFR 1926</a></div>
-                    <div class="source-item">• <a href="https://www.osha.gov/construction" target="_blank">OSHA Construction</a></div>
-                    <div class="source-item">• <a href="https://www.epa.gov/eg/construction-and-development-effluent-guidelines" target="_blank">EPA 40 CFR 450</a></div>
-                    <div class="source-item">• <a href="https://www.epa.gov/laws-regulations" target="_blank">EPA Laws & Regulations</a></div>
-                    <div class="source-item">• <a href="https://www.transportation.gov/roadways-and-bridges" target="_blank">US DOT Roads & Bridges</a></div>
-                    <div class="source-item">• <a href="https://highways.dot.gov/fed-aid-essentials/videos/project-development/design-project-geometric-design-requirements" target="_blank">FHWA Geometric Design</a></div>
-                    <div class="source-item">• <a href="https://global.iccsafe.org/international-codes-and-standards/" target="_blank">ICC I-Codes</a></div>
-                    <div class="source-item">• <a href="https://www.asce.org/publications-and-news/codes-and-standards" target="_blank">ASCE Standards</a></div>
-                    <div class="source-item">• <a href="https://www.asme.org/codes-standards" target="_blank">ASME Codes</a></div>
-                    <div class="source-item">• <a href="https://www.fhwa.dot.gov/programadmin/121205.cfm" target="_blank">Brooks Act</a></div>
-                    <div class="source-item">• <a href="https://www.acquisition.gov/far/subpart-36.6" target="_blank">FAR Subpart 36.6</a></div>
-                    <div class="source-item">• <a href="https://www.gsa.gov/real-estate/design-and-construction/facilities-standards-for-the-public-buildings-service" target="_blank">GSA Facilities Standards</a></div>
-                    <div class="source-item">• <a href="https://www.congress.gov/crs-product/R47666" target="_blank">Congressional Research</a></div>
-                    <div class="source-item">• <a href="https://www.ansi.org" target="_blank">ANSI</a></div>
-                    <div class="source-item">• <a href="https://www.astm.org" target="_blank">ASTM International</a></div>
-                    <div class="source-item">• <a href="https://store.astm.org/products-services/standards-and-publications/standards/construction-standards.html" target="_blank">ASTM Construction</a></div>
-                    <div class="source-item">• <a href="https://www.nfpa.org/codes-and-standards" target="_blank">NFPA Codes</a></div>
-                    <div class="source-item">• <a href="https://codesonline.nfpa.org" target="_blank">NFPA Online</a></div>
-                    <div class="source-item">• <a href="https://www.apwa.org/resources/about-public-works/" target="_blank">APWA</a></div>
-                    <div class="source-item">• <a href="https://www.nist.gov" target="_blank">NIST</a></div>
-                    <div class="source-item">• <a href="https://www.epa.gov/sites/default/files/2015-10/documents/myerguide.pdf" target="_blank">EPA MYER Guide</a></div>
-                    <div class="source-item">• <a href="https://www.cem.va.gov/pdf/fedreqs.pdf" target="_blank">Federal Environmental Reqs</a></div>
+                <div class="source-grid">
+                    <a href="https://www.acquisition.gov/far/part-36" target="_blank" class="source-link">• FAR Part 36</a>
+                    <a href="https://highways.dot.gov/federal-lands/specs" target="_blank" class="source-link">• FHWA Standards</a>
+                    <a href="https://www.osha.gov/laws-regs/regulations/standardnumber/1926" target="_blank" class="source-link">• OSHA 29 CFR 1926</a>
+                    <a href="https://www.osha.gov/construction" target="_blank" class="source-link">• OSHA Construction</a>
+                    <a href="https://www.epa.gov/eg/construction-and-development-effluent-guidelines" target="_blank" class="source-link">• EPA 40 CFR 450</a>
+                    <a href="https://www.epa.gov/laws-regulations" target="_blank" class="source-link">• EPA Laws & Regulations</a>
+                    <a href="https://www.transportation.gov/roadways-and-bridges" target="_blank" class="source-link">• US DOT Roads & Bridges</a>
+                    <a href="https://highways.dot.gov/fed-aid-essentials/videos/project-development/design-project-geometric-design-requirements" target="_blank" class="source-link">• FHWA Geometric Design</a>
+                    <a href="https://global.iccsafe.org/international-codes-and-standards/" target="_blank" class="source-link">• ICC I-Codes</a>
+                    <a href="https://www.asce.org/publications-and-news/codes-and-standards" target="_blank" class="source-link">• ASCE Standards</a>
+                    <a href="https://www.asme.org/codes-standards" target="_blank" class="source-link">• ASME Codes</a>
+                    <a href="https://www.fhwa.dot.gov/programadmin/121205.cfm" target="_blank" class="source-link">• Brooks Act</a>
+                    <a href="https://www.acquisition.gov/far/subpart-36.6" target="_blank" class="source-link">• FAR Subpart 36.6</a>
+                    <a href="https://www.gsa.gov/real-estate/design-and-construction/facilities-standards-for-the-public-buildings-service" target="_blank" class="source-link">• GSA Facilities Standards</a>
+                    <a href="https://www.congress.gov/crs-product/R47666" target="_blank" class="source-link">• Congressional Research</a>
+                    <a href="https://www.ansi.org" target="_blank" class="source-link">• ANSI</a>
+                    <a href="https://www.astm.org" target="_blank" class="source-link">• ASTM International</a>
+                    <a href="https://store.astm.org/products-services/standards-and-publications/standards/construction-standards.html" target="_blank" class="source-link">• ASTM Construction</a>
+                    <a href="https://www.nfpa.org/codes-and-standards" target="_blank" class="source-link">• NFPA Codes</a>
+                    <a href="https://codesonline.nfpa.org" target="_blank" class="source-link">• NFPA Online</a>
+                    <a href="https://www.apwa.org/resources/about-public-works/" target="_blank" class="source-link">• APWA</a>
+                    <a href="https://www.nist.gov" target="_blank" class="source-link">• NIST</a>
+                    <a href="https://www.epa.gov/sites/default/files/2015-10/documents/myerguide.pdf" target="_blank" class="source-link">• EPA MYER Guide</a>
+                    <a href="https://www.cem.va.gov/pdf/fedreqs.pdf" target="_blank" class="source-link">• Federal Environmental Reqs</a>
                 </div>
-                <p style="margin-top: 15px; font-size: 0.85em; color: #999;">
+                <p style="margin-top: 1rem; font-size: 0.875rem; color: var(--text-light);">
                     Plus 102 state-specific DOT and professional licensing sources
                 </p>
             </div>
         </div>
     </div>
-    
+
     <script>
         let sessionId = null;
-        
-        // Load roles and departments
+
+        // Load configuration
         async function loadConfiguration() {
             try {
                 const rolesResponse = await fetch('/roles');
@@ -1115,11 +1217,11 @@ HTML_TEMPLATE = """
                 roleSelect.innerHTML = roles.map(role => 
                     `<option value="${role.id}">${role.name}</option>`
                 ).join('');
-                
+
                 const deptsResponse = await fetch('/departments');
                 const depts = await deptsResponse.json();
                 const deptSelect = document.getElementById('departmentSelect');
-                deptSelect.innerHTML = '<option value="">Select Department (Optional)</option>' +
+                deptSelect.innerHTML = '<option value="">Select Department</option>' +
                     depts.map(dept => 
                         `<option value="${dept.id}">${dept.name}</option>`
                     ).join('');
@@ -1127,85 +1229,89 @@ HTML_TEMPLATE = """
                 console.error('Error loading configuration:', error);
             }
         }
-        
-        // Drag and drop handlers
-        const uploadArea = document.getElementById('uploadArea');
-        
-        uploadArea.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            uploadArea.classList.add('dragover');
+
+        // Drag and drop
+        const uploadZone = document.getElementById('uploadZone');
+
+        uploadZone.addEventListener('click', () => {
+            document.getElementById('fileInput').click();
         });
-        
-        uploadArea.addEventListener('dragleave', () => {
-            uploadArea.classList.remove('dragover');
-        });
-        
-        uploadArea.addEventListener('drop', (e) => {
+
+        uploadZone.addEventListener('dragover', (e) => {
             e.preventDefault();
-            uploadArea.classList.remove('dragover');
+            uploadZone.classList.add('dragover');
+        });
+
+        uploadZone.addEventListener('dragleave', () => {
+            uploadZone.classList.remove('dragover');
+        });
+
+        uploadZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadZone.classList.remove('dragover');
             const files = e.dataTransfer.files;
             if (files.length > 0) {
                 handleFile(files[0]);
             }
         });
-        
+
         function handleFileSelect(event) {
             const file = event.target.files[0];
             if (file) {
                 handleFile(file);
             }
         }
-        
+
         async function handleFile(file) {
             if (!file.name.endsWith('.pdf')) {
-                showStatus('Please upload a PDF file', 'error');
+                showAlert('Please upload a PDF file', 'error');
                 return;
             }
-            
+
             const formData = new FormData();
             formData.append('file', file);
-            
-            showStatus('Uploading and processing document...', 'info');
-            
+
+            showAlert('Uploading and processing document...', 'info');
+
             try {
                 const response = await fetch('/upload', {
                     method: 'POST',
                     body: formData
                 });
-                
+
                 const data = await response.json();
-                
+
                 if (response.ok) {
                     sessionId = data.session_id;
-                    showStatus(`✅ ${data.message}`, 'success');
+                    showAlert(`✅ ${data.message}`, 'success');
                     document.getElementById('querySection').style.display = 'block';
                     document.getElementById('responseSection').style.display = 'block';
                     loadCustomUrls();
                 } else {
-                    showStatus(`Error: ${data.detail}`, 'error');
+                    showAlert(`Error: ${data.detail}`, 'error');
                 }
             } catch (error) {
-                showStatus(`Error uploading file: ${error.message}`, 'error');
+                showAlert(`Error uploading file: ${error.message}`, 'error');
             }
         }
-        
+
         async function submitQuery() {
             const query = document.getElementById('queryInput').value.trim();
             if (!query) {
-                showStatus('Please enter a question', 'error');
+                showAlert('Please enter a question', 'error');
                 return;
             }
-            
+
             if (!sessionId) {
-                showStatus('Please upload a document first', 'error');
+                showAlert('Please upload a document first', 'error');
                 return;
             }
-            
+
             const role = document.getElementById('roleSelect').value;
             const department = document.getElementById('departmentSelect').value;
-            
-            showStatus('Processing your question...', 'info');
-            
+
+            showAlert('Processing your question...', 'info');
+
             try {
                 const response = await fetch('/query', {
                     method: 'POST',
@@ -1219,40 +1325,40 @@ HTML_TEMPLATE = """
                         department: department || null
                     })
                 });
-                
+
                 const data = await response.json();
-                
+
                 if (response.ok) {
-                    document.getElementById('responseArea').textContent = data.answer;
-                    showStatus('✅ Response generated', 'success');
+                    document.getElementById('responseBox').textContent = data.answer;
+                    showAlert('✅ Response generated', 'success');
                 } else {
-                    showStatus(`Error: ${data.detail}`, 'error');
+                    showAlert(`Error: ${data.detail}`, 'error');
                 }
             } catch (error) {
-                showStatus(`Error: ${error.message}`, 'error');
+                showAlert(`Error: ${error.message}`, 'error');
             }
         }
-        
+
         function handleQueryKeyPress(event) {
             if (event.key === 'Enter') {
                 submitQuery();
             }
         }
-        
+
         async function addCustomUrl() {
             const urlInput = document.getElementById('customUrlInput');
             const url = urlInput.value.trim();
-            
+
             if (!url) {
-                showStatus('Please enter a URL', 'error');
+                showAlert('Please enter a URL', 'error');
                 return;
             }
-            
+
             if (!sessionId) {
-                showStatus('Please upload a document first', 'error');
+                showAlert('Please upload a document first', 'error');
                 return;
             }
-            
+
             try {
                 const response = await fetch('/custom-url/add', {
                     method: 'POST',
@@ -1264,36 +1370,36 @@ HTML_TEMPLATE = """
                         url: url
                     })
                 });
-                
+
                 const data = await response.json();
-                
+
                 if (response.ok) {
-                    showStatus('✅ URL added successfully', 'success');
+                    showAlert('✅ URL added successfully', 'success');
                     urlInput.value = '';
                     loadCustomUrls();
                 } else {
-                    showStatus(`Error: ${data.detail}`, 'error');
+                    showAlert(`Error: ${data.detail}`, 'error');
                 }
             } catch (error) {
-                showStatus(`Error: ${error.message}`, 'error');
+                showAlert(`Error: ${error.message}`, 'error');
             }
         }
-        
+
         async function loadCustomUrls() {
             if (!sessionId) return;
-            
+
             try {
                 const response = await fetch(`/custom-url/list/${sessionId}`);
                 const data = await response.json();
-                
+
                 const listDiv = document.getElementById('customUrlList');
                 if (data.custom_urls.length === 0) {
-                    listDiv.innerHTML = '<p style="color: #999; font-size: 0.9em; margin-top: 10px;">No custom URLs added yet</p>';
+                    listDiv.innerHTML = '<p style="color: #64748b; font-size: 0.875rem; margin-top: 0.75rem;">No custom URLs added yet</p>';
                 } else {
                     listDiv.innerHTML = data.custom_urls.map(url => `
-                        <div class="custom-url-item">
-                            <span style="font-size: 0.9em;">${url}</span>
-                            <button class="remove-btn" onclick="removeCustomUrl('${url}')">Remove</button>
+                        <div class="url-item">
+                            <span>${url}</span>
+                            <button class="btn-remove" onclick="removeCustomUrl('${url}')">Remove</button>
                         </div>
                     `).join('');
                 }
@@ -1301,7 +1407,7 @@ HTML_TEMPLATE = """
                 console.error('Error loading custom URLs:', error);
             }
         }
-        
+
         async function removeCustomUrl(url) {
             try {
                 const response = await fetch('/custom-url/remove', {
@@ -1314,38 +1420,37 @@ HTML_TEMPLATE = """
                         url: url
                     })
                 });
-                
+
                 if (response.ok) {
-                    showStatus('✅ URL removed', 'success');
+                    showAlert('✅ URL removed', 'success');
                     loadCustomUrls();
                 } else {
-                    showStatus('Error removing URL', 'error');
+                    showAlert('Error removing URL', 'error');
                 }
             } catch (error) {
-                showStatus(`Error: ${error.message}`, 'error');
+                showAlert(`Error: ${error.message}`, 'error');
             }
         }
-        
-        function showStatus(message, type) {
-            const status = document.getElementById('status');
-            status.textContent = message;
-            status.className = `status ${type}`;
-            status.style.display = 'block';
-            
+
+        function showAlert(message, type) {
+            const alertBox = document.getElementById('alertBox');
+            alertBox.textContent = message;
+            alertBox.className = `alert alert-${type} show`;
+
             if (type === 'success') {
                 setTimeout(() => {
-                    status.style.display = 'none';
+                    alertBox.classList.remove('show');
                 }, 5000);
             }
         }
-        
+
         function toggleFooter() {
             const content = document.getElementById('footerContent');
             const arrow = document.getElementById('footerArrow');
-            content.classList.toggle('expanded');
-            arrow.textContent = content.classList.contains('expanded') ? '▲' : '▼';
+            content.classList.toggle('show');
+            arrow.classList.toggle('expanded');
         }
-        
+
         // Initialize
         loadConfiguration();
     </script>
