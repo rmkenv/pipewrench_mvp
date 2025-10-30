@@ -1,47 +1,724 @@
-from fastapi import FastAPI, Request, UploadFile, File
+"""
+DPW Knowledge Capture System - Standalone Version
+All configurations embedded for Vercel deployment
+"""
+
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.responses import HTMLResponse, JSONResponse
-from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from typing import List, Optional, Dict
 import uvicorn
-from datetime import datetime
-import json
-from typing import List, Dict
 import PyPDF2
 import io
+import re
+from urllib.parse import urlparse
 
-# Import configuration modules
-from job_roles_config import get_role_list, get_role_context
-from url_whitelist_config import (
-    is_url_whitelisted, 
-    get_whitelisted_sources,
-    add_custom_url,
-    remove_custom_url,
-    get_custom_urls,
-    get_all_whitelisted_urls
-)
-from department_prompts_config import get_department_prompt, get_all_departments
+app = FastAPI()
 
-app = FastAPI(title="PipeWrench AI")
+# ============================================================================
+# CONFIGURATION: JOB ROLES
+# ============================================================================
 
-# CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+JOB_ROLES = {
+    "general": {
+        "name": "General DPW Staff",
+        "context": "You are assisting general Department of Public Works staff with municipal infrastructure questions."
+    },
+    "director": {
+        "name": "DPW Director",
+        "context": "You are assisting a DPW Director with strategic planning, policy decisions, and departmental oversight."
+    },
+    "engineer": {
+        "name": "Civil Engineer",
+        "context": "You are assisting a licensed civil engineer with technical engineering standards, design specifications, and compliance requirements."
+    },
+    "project_manager": {
+        "name": "Project Manager",
+        "context": "You are assisting a project manager with construction management, scheduling, budgeting, and contractor coordination."
+    },
+    "inspector": {
+        "name": "Construction Inspector",
+        "context": "You are assisting a construction inspector with field inspection procedures, quality control, and compliance verification."
+    },
+    "maintenance": {
+        "name": "Maintenance Supervisor",
+        "context": "You are assisting a maintenance supervisor with asset management, preventive maintenance, and repair operations."
+    },
+    "environmental": {
+        "name": "Environmental Compliance Officer",
+        "context": "You are assisting an environmental compliance officer with EPA regulations, stormwater management, and environmental permits."
+    },
+    "safety": {
+        "name": "Safety Officer",
+        "context": "You are assisting a safety officer with OSHA compliance, workplace safety, and accident prevention."
+    }
+}
 
-# In-memory session storage
-sessions = {}
+def get_role_list():
+    """Return list of available roles"""
+    return [{"id": role_id, "name": role_data["name"]} for role_id, role_data in JOB_ROLES.items()]
 
-# HTML Template
+def get_role_context(role_id: str) -> str:
+    """Get context for a specific role"""
+    return JOB_ROLES.get(role_id, JOB_ROLES["general"])["context"]
+
+# ============================================================================
+# CONFIGURATION: URL WHITELIST
+# ============================================================================
+
+URL_WHITELIST = [
+    {"url": "https://www.acquisition.gov/far/part-36", "include_children": True},
+    {"url": "https://highways.dot.gov/federal-lands/specs", "include_children": True},
+    {"url": "https://www.osha.gov/laws-regs/regulations/standardnumber/1926", "include_children": True},
+    {"url": "https://www.osha.gov/construction", "include_children": True},
+    {"url": "https://www.epa.gov/eg/construction-and-development-effluent-guidelines", "include_children": True},
+    {"url": "https://www.epa.gov/laws-regulations", "include_children": True},
+    {"url": "https://www.epa.gov/sites/default/files/2015-10/documents/myerguide.pdf", "include_children": True},
+    {"url": "https://www.cem.va.gov/pdf/fedreqs.pdf", "include_children": True},
+    {"url": "https://www.transportation.gov/roadways-and-bridges", "include_children": True},
+    {"url": "https://highways.dot.gov/fed-aid-essentials/videos/project-development/design-project-geometric-design-requirements", "include_children": True},
+    {"url": "https://global.iccsafe.org/international-codes-and-standards/", "include_children": True},
+    {"url": "https://www.asce.org/publications-and-news/codes-and-standards", "include_children": True},
+    {"url": "https://www.asme.org/codes-standards", "include_children": True},
+    {"url": "https://www.fhwa.dot.gov/programadmin/121205.cfm", "include_children": True},
+    {"url": "https://www.acquisition.gov/far/subpart-36.6", "include_children": True},
+    {"url": "https://www.gsa.gov/real-estate/design-and-construction/facilities-standards-for-the-public-buildings-service", "include_children": True},
+    {"url": "https://www.congress.gov/crs-product/R47666", "include_children": True},
+    {"url": "https://www.ansi.org", "include_children": True},
+    {"url": "https://www.astm.org", "include_children": True},
+    {"url": "https://store.astm.org/products-services/standards-and-publications/standards/construction-standards.html", "include_children": True},
+    {"url": "https://www.nfpa.org/codes-and-standards", "include_children": True},
+    {"url": "https://codesonline.nfpa.org", "include_children": True},
+    {"url": "https://www.apwa.org/resources/about-public-works/", "include_children": True},
+    {"url": "https://www.nist.gov", "include_children": True},
+    {"url": "https://www.dot.state.al.us/publications/Maintenance/pdf/Permits/PermitManual.pdf", "include_children": True},
+    {"url": "https://bels.alabama.gov", "include_children": True},
+    {"url": "https://dot.alaska.gov/stwddes/dcsstandards.shtml", "include_children": True},
+    {"url": "https://www.commerce.alaska.gov/web/cbpl/ProfessionalLicensing/BoardofArchitectsEngineersandLandSurveyors.aspx", "include_children": True},
+    {"url": "https://azdot.gov/business/engineering-standards", "include_children": True},
+    {"url": "https://btr.az.gov/licensing/professional-engineering", "include_children": True},
+    {"url": "https://www.arkansashighways.com/standard_specifications.aspx", "include_children": True},
+    {"url": "https://www.arkansas.gov/pels/", "include_children": True},
+    {"url": "https://www.dir.ca.gov/public-works/publicworks.html", "include_children": True},
+    {"url": "https://www.bpelsg.ca.gov/", "include_children": True},
+    {"url": "https://www.codot.gov/business/designsupport/cdot-construction-specifications", "include_children": True},
+    {"url": "https://dpo.colorado.gov/Engineers", "include_children": True},
+    {"url": "https://portal.ct.gov/DOT/Engineering", "include_children": True},
+    {"url": "https://portal.ct.gov/DCP/License-Services-Division/PE-Home-Page/Professional-Engineer-PE", "include_children": True},
+    {"url": "https://deldot.gov/Programs/DRC/", "include_children": True},
+    {"url": "https://dpr.delaware.gov/boards/professionalengineers/", "include_children": True},
+    {"url": "https://dpw.dc.gov/", "include_children": True},
+    {"url": "https://dcra.dc.gov/service/professional-engineers", "include_children": True},
+    {"url": "https://www.fdot.gov/programmanagement/implemented/specbooks/default.shtm", "include_children": True},
+    {"url": "https://fbpe.org/", "include_children": True},
+    {"url": "https://www.dot.ga.gov/PartnerSmart/DesignManuals/Specifications", "include_children": True},
+    {"url": "https://sos.ga.gov/page/engineers-land-surveyors", "include_children": True},
+    {"url": "https://hidot.hawaii.gov/highways/home/standards-and-specifications/", "include_children": True},
+    {"url": "https://cca.hawaii.gov/pvl/boards/engineer/", "include_children": True},
+    {"url": "https://itd.idaho.gov/highway-construction-standards/", "include_children": True},
+    {"url": "https://ipels.idaho.gov/", "include_children": True},
+    {"url": "https://idot.illinois.gov/doing-business/procurements/engineering-architectural-professional-services/index.html", "include_children": True},
+    {"url": "https://www.idfpr.com/profs/ProfEng.asp", "include_children": True},
+    {"url": "https://www.in.gov/indot/construction/design-standards/", "include_children": True},
+    {"url": "https://www.in.gov/pla/professions/professional-engineers/", "include_children": True},
+    {"url": "https://iowadot.gov/design/dmanual", "include_children": True},
+    {"url": "https://plb.iowa.gov/board/engineering-and-land-surveying", "include_children": True},
+    {"url": "https://www.ksdot.org/bureaus/burConsMain/SpecProv/specprov.asp", "include_children": True},
+    {"url": "https://www.kansas.gov/engineers/", "include_children": True},
+    {"url": "https://transportation.ky.gov/Highway-Design/Pages/Design-Guidance.aspx", "include_children": True},
+    {"url": "https://kyboels.ky.gov/", "include_children": True},
+    {"url": "https://www.dotd.la.gov/engineering/standards/", "include_children": True},
+    {"url": "https://lapels.com/", "include_children": True},
+    {"url": "https://www.maine.gov/mdot/engineering/", "include_children": True},
+    {"url": "https://www.maine.gov/professionalengineers/", "include_children": True},
+    {"url": "https://www.roads.maryland.gov/ohd2/", "include_children": True},
+    {"url": "https://dllr.maryland.gov/license/pe/", "include_children": True},
+    {"url": "https://www.mass.gov/orgs/highway-division", "include_children": True},
+    {"url": "https://www.mass.gov/orgs/board-of-registration-of-professional-engineers-and-land-surveyors", "include_children": True},
+    {"url": "https://www.michigan.gov/mdot/design/standards", "include_children": True},
+    {"url": "https://www.michigan.gov/lara/bureau-list/bpl/occ/prof/engineers", "include_children": True},
+    {"url": "https://www.dot.state.mn.us/bridge/manuals.html", "include_children": True},
+    {"url": "https://mn.gov/boards/engineering/", "include_children": True},
+    {"url": "https://www.mdot.ms.gov/portal/home/engineering", "include_children": True},
+    {"url": "https://www.pepls.ms.gov/", "include_children": True},
+    {"url": "https://www.modot.org/engineering-policy-guide", "include_children": True},
+    {"url": "https://pr.mo.gov/engineers-architects-land-surveyors.asp", "include_children": True},
+    {"url": "https://www.mdt.mt.gov/publications/manuals.shtml", "include_children": True},
+    {"url": "https://boards.bsd.dli.mt.gov/pel", "include_children": True},
+    {"url": "https://dot.nebraska.gov/business-center/design-consultant/design-manuals/", "include_children": True},
+    {"url": "https://engineers.nebraska.gov/", "include_children": True},
+    {"url": "https://www.dot.nv.gov/doing-business/design-engineering", "include_children": True},
+    {"url": "https://nv.gov/BOE/", "include_children": True},
+    {"url": "https://www.nh.gov/dot/programs/projectdevelopment/", "include_children": True},
+    {"url": "https://www.oplc.nh.gov/board-professional-engineers", "include_children": True},
+    {"url": "https://www.nj.gov/transportation/eng/", "include_children": True},
+    {"url": "https://www.njconsumeraffairs.gov/pels/", "include_children": True},
+    {"url": "https://www.dot.nm.gov/engineering/", "include_children": True},
+    {"url": "https://www.rld.nm.gov/boards-and-commissions/individual-boards-and-commissions/professional-engineers-and-professional-surveyors/", "include_children": True},
+    {"url": "https://www.dot.ny.gov/divisions/engineering", "include_children": True},
+    {"url": "https://www.op.nysed.gov/professions/engineering", "include_children": True},
+    {"url": "https://www.ncdot.gov/engineering/", "include_children": True},
+    {"url": "https://www.ncbels.org/", "include_children": True},
+    {"url": "https://www.dot.nd.gov/divisions/design/", "include_children": True},
+    {"url": "https://www.ndpelsboard.org/", "include_children": True},
+    {"url": "https://www.transportation.ohio.gov/working/engineering", "include_children": True},
+    {"url": "https://peps.ohio.gov/", "include_children": True},
+    {"url": "https://www.odot.org/roadway/", "include_children": True},
+    {"url": "https://www.ok.gov/pels/", "include_children": True},
+    {"url": "https://www.oregon.gov/odot/Engineering/Pages/Standards.aspx", "include_children": True},
+    {"url": "https://www.oregon.gov/osbeels/", "include_children": True},
+    {"url": "https://www.penndot.pa.gov/ProjectAndPrograms/Design/Pages/default.aspx", "include_children": True},
+    {"url": "https://www.dos.pa.gov/ProfessionalLicensing/BoardsCommissions/Engineers/Pages/default.aspx", "include_children": True},
+    {"url": "https://www.dot.ri.gov/engineering/", "include_children": True},
+    {"url": "https://health.ri.gov/licenses/detail.php?id=250", "include_children": True},
+    {"url": "https://www.scdot.org/business/engineering.aspx", "include_children": True},
+    {"url": "https://llr.sc.gov/pel/", "include_children": True},
+    {"url": "https://dot.sd.gov/doing-business/engineering", "include_children": True},
+    {"url": "https://dlr.sd.gov/bdotm/engineeringsurveying/", "include_children": True},
+    {"url": "https://www.tn.gov/tdot/roadway-design.html", "include_children": True},
+    {"url": "https://www.tn.gov/commerce/regboards/aeel.html", "include_children": True},
+    {"url": "https://www.txdot.gov/inside-txdot/division/design.html", "include_children": True},
+    {"url": "https://pels.texas.gov/", "include_children": True},
+    {"url": "https://www.udot.utah.gov/main/f?p=100:pg:0:::1:T,V:1435", "include_children": True},
+    {"url": "https://dopl.utah.gov/eng/", "include_children": True},
+    {"url": "https://vtrans.vermont.gov/highway-construction", "include_children": True},
+    {"url": "https://sos.vermont.gov/engineers-land-surveyors/", "include_children": True},
+    {"url": "https://www.virginiadot.org/business/design-manual.asp", "include_children": True},
+    {"url": "https://www.dpor.virginia.gov/boards/professional-engineers", "include_children": True},
+    {"url": "https://wsdot.wa.gov/engineering-standards/design-topics-manuals", "include_children": True},
+    {"url": "https://fortress.wa.gov/dol/dolprod/bpdlicensing/", "include_children": True},
+    {"url": "https://transportation.wv.gov/highways/engineering/Pages/default.aspx", "include_children": True},
+    {"url": "https://peboards.wv.gov/", "include_children": True},
+    {"url": "https://wisconsindot.gov/Pages/doing-bus/eng-consultants/cnslt-rsrces/design/default.aspx", "include_children": True},
+    {"url": "https://dsps.wi.gov/Pages/Professions/Engineer/Default.aspx", "include_children": True},
+    {"url": "https://www.dot.state.wy.us/home/engineering_technical_programs/engineering_programs.html", "include_children": True},
+    {"url": "https://engineer-lsla.wyoming.gov/", "include_children": True},
+]
+
+# Session storage for custom URLs
+session_custom_urls: Dict[str, List[str]] = {}
+
+def is_url_whitelisted(url: str, session_id: str = None) -> bool:
+    """Check if URL is in whitelist or custom session URLs"""
+    parsed_url = urlparse(url)
+    base_url = f"{parsed_url.scheme}://{parsed_url.netloc}{parsed_url.path}"
+    
+    # Check default whitelist
+    for entry in URL_WHITELIST:
+        whitelisted_url = entry["url"]
+        if entry["include_children"]:
+            if base_url.startswith(whitelisted_url.rstrip('/')):
+                return True
+        else:
+            if base_url == whitelisted_url:
+                return True
+    
+    # Check session custom URLs
+    if session_id and session_id in session_custom_urls:
+        for custom_url in session_custom_urls[session_id]:
+            if base_url.startswith(custom_url.rstrip('/')):
+                return True
+    
+    return False
+
+def get_whitelisted_sources() -> List[Dict[str, str]]:
+    """Return formatted list of whitelisted sources"""
+    sources = []
+    for entry in URL_WHITELIST:
+        sources.append({
+            "url": entry["url"],
+            "include_children": entry["include_children"]
+        })
+    return sources
+
+def get_federal_sources() -> List[str]:
+    """Return list of federal source URLs"""
+    federal_keywords = ['acquisition.gov', 'dot.gov', 'osha.gov', 'epa.gov', 'fhwa.dot', 
+                       'transportation.gov', 'gsa.gov', 'congress.gov', 'nist.gov']
+    federal_sources = []
+    for entry in URL_WHITELIST:
+        if any(keyword in entry["url"] for keyword in federal_keywords):
+            federal_sources.append(entry["url"])
+    return federal_sources
+
+# ============================================================================
+# CONFIGURATION: DEPARTMENT PROMPTS
+# ============================================================================
+
+DEPARTMENT_PROMPTS = {
+    "streets_roads": {
+        "name": "Streets & Roads",
+        "prompt": """You are a specialized AI assistant for municipal Streets & Roads operations.
+
+**Your Expertise:**
+- Pavement management and maintenance
+- Street design standards and specifications
+- Traffic control devices and signage
+- Roadway safety improvements
+- Winter maintenance operations
+- Street lighting and signals
+- ADA compliance for pedestrian facilities
+
+**Key Responsibilities:**
+- Provide guidance on MUTCD standards
+- Assist with pavement condition assessments
+- Recommend maintenance strategies
+- Explain traffic calming measures
+- Guide winter operations planning
+
+Always reference applicable federal (FHWA, MUTCD) and state DOT standards."""
+    },
+    "water_sewer": {
+        "name": "Water & Sewer",
+        "prompt": """You are a specialized AI assistant for municipal Water & Sewer utilities.
+
+**Your Expertise:**
+- Water distribution system design and maintenance
+- Wastewater collection systems
+- Stormwater management
+- EPA Clean Water Act compliance
+- AWWA and WEF standards
+- Pump station operations
+- Water quality monitoring
+
+**Key Responsibilities:**
+- Guide compliance with Safe Drinking Water Act
+- Assist with capacity planning
+- Explain treatment processes
+- Recommend infrastructure improvements
+- Address regulatory requirements
+
+Always reference EPA regulations, state environmental standards, and industry best practices (AWWA, WEF)."""
+    },
+    "solid_waste": {
+        "name": "Solid Waste & Recycling",
+        "prompt": """You are a specialized AI assistant for Solid Waste & Recycling operations.
+
+**Your Expertise:**
+- Collection route optimization
+- Recycling program management
+- Landfill operations and regulations
+- Hazardous waste handling
+- EPA RCRA compliance
+- Waste reduction strategies
+- Equipment specifications
+
+**Key Responsibilities:**
+- Guide EPA waste regulations compliance
+- Recommend collection best practices
+- Assist with recycling program development
+- Explain proper disposal procedures
+- Address environmental concerns
+
+Always reference EPA RCRA regulations, state solid waste rules, and industry standards."""
+    },
+    "fleet_equipment": {
+        "name": "Fleet & Equipment",
+        "prompt": """You are a specialized AI assistant for Fleet & Equipment management.
+
+**Your Expertise:**
+- Fleet maintenance programs
+- Equipment specifications and procurement
+- Preventive maintenance scheduling
+- Fuel management
+- Vehicle replacement planning
+- Shop safety (OSHA compliance)
+- Telematics and fleet tracking
+
+**Key Responsibilities:**
+- Recommend maintenance best practices
+- Guide equipment selection
+- Assist with lifecycle cost analysis
+- Explain OSHA shop safety requirements
+- Support fleet optimization
+
+Always reference OSHA standards, manufacturer specifications, and fleet management best practices."""
+    },
+    "parks_facilities": {
+        "name": "Parks & Facilities",
+        "prompt": """You are a specialized AI assistant for Parks & Facilities management.
+
+**Your Expertise:**
+- Park maintenance operations
+- Playground safety standards (CPSC, ASTM)
+- Building maintenance
+- Grounds management
+- ADA accessibility requirements
+- Athletic field maintenance
+- Facility energy management
+
+**Key Responsibilities:**
+- Guide CPSC Playground safety compliance
+- Recommend maintenance schedules
+- Assist with accessibility improvements
+- Explain building code requirements
+- Support sustainability initiatives
+
+Always reference CPSC guidelines, ASTM standards, ADA requirements, and building codes."""
+    },
+    "engineering": {
+        "name": "Engineering & Design",
+        "prompt": """You are a specialized AI assistant for municipal Engineering & Design.
+
+**Your Expertise:**
+- Civil engineering design standards
+- Construction specifications
+- Plan review and permitting
+- Surveying and GIS
+- Professional engineering requirements
+- Project management
+- Value engineering
+
+**Key Responsibilities:**
+- Guide engineering design standards
+- Assist with specification development
+- Explain permitting requirements
+- Support project delivery methods
+- Address professional licensing requirements
+
+Always reference ASCE standards, state engineering requirements, and applicable building codes."""
+    },
+    "construction": {
+        "name": "Construction Management",
+        "prompt": """You are a specialized AI assistant for Construction Management.
+
+**Your Expertise:**
+- Construction inspection procedures
+- Quality control and assurance
+- Contract administration
+- Change order management
+- Progress monitoring
+- Safety compliance (OSHA)
+- Materials testing
+
+**Key Responsibilities:**
+- Guide inspection best practices
+- Assist with contract interpretation
+- Explain quality control procedures
+- Support safety compliance
+- Address construction documentation
+
+Always reference OSHA construction standards, contract specifications, and industry best practices."""
+    },
+    "environmental": {
+        "name": "Environmental Compliance",
+        "prompt": """You are a specialized AI assistant for Environmental Compliance.
+
+**Your Expertise:**
+- EPA regulations (Clean Water Act, Clean Air Act)
+- NPDES stormwater permits
+- Environmental impact assessments
+- Wetlands protection
+- Erosion and sediment control
+- Hazardous materials management
+- Environmental monitoring
+
+**Key Responsibilities:**
+- Guide EPA compliance requirements
+- Assist with permit applications
+- Explain environmental regulations
+- Support pollution prevention
+- Address remediation procedures
+
+Always reference EPA regulations (40 CFR), state environmental rules, and environmental best practices."""
+    },
+    "safety": {
+        "name": "Safety & Training",
+        "prompt": """You are a specialized AI assistant for Safety & Training.
+
+**Your Expertise:**
+- OSHA regulations (29 CFR 1926, 1910)
+- Workplace safety programs
+- Confined space entry
+- Trenching and excavation safety
+- Personal protective equipment
+- Safety training requirements
+- Accident investigation
+
+**Key Responsibilities:**
+- Guide OSHA compliance
+- Recommend safety procedures
+- Assist with training program development
+- Explain PPE requirements
+- Support incident prevention
+
+Always reference OSHA standards (29 CFR), ANSI standards, and safety best practices."""
+    },
+    "administration": {
+        "name": "Administration & Planning",
+        "prompt": """You are a specialized AI assistant for DPW Administration & Planning.
+
+**Your Expertise:**
+- Capital improvement planning
+- Budget development
+- Asset management
+- Performance metrics
+- Grant administration
+- Public communication
+- Strategic planning
+
+**Key Responsibilities:**
+- Guide planning processes
+- Assist with budget preparation
+- Explain grant requirements
+- Support asset management programs
+- Address administrative procedures
+
+Always reference applicable federal grant requirements, municipal finance best practices, and planning standards."""
+    }
+}
+
+def get_department_prompt(department_id: str) -> str:
+    """Get specialized prompt for department"""
+    return DEPARTMENT_PROMPTS.get(department_id, {}).get("prompt", "")
+
+def get_all_departments():
+    """Return list of all departments"""
+    return [{"id": dept_id, "name": dept_data["name"]} for dept_id, dept_data in DEPARTMENT_PROMPTS.items()]
+
+# ============================================================================
+# SESSION STORAGE
+# ============================================================================
+
+# In-memory session storage (use Redis/database in production)
+sessions: Dict[str, Dict] = {}
+
+# ============================================================================
+# PYDANTIC MODELS
+# ============================================================================
+
+class QueryRequest(BaseModel):
+    session_id: str
+    query: str
+    role: Optional[str] = "general"
+    department: Optional[str] = None
+
+class UploadResponse(BaseModel):
+    session_id: str
+    filename: str
+    pages: int
+    message: str
+
+class CustomURLRequest(BaseModel):
+    session_id: str
+    url: str
+
+# ============================================================================
+# HELPER FUNCTIONS
+# ============================================================================
+
+def extract_text_from_pdf(pdf_file: bytes) -> str:
+    """Extract text from PDF file"""
+    try:
+        pdf_reader = PyPDF2.PdfReader(io.BytesIO(pdf_file))
+        text = ""
+        for page in pdf_reader.pages:
+            text += page.extract_text() + "\n"
+        return text
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error reading PDF: {str(e)}")
+
+def create_system_prompt(role: str, department: Optional[str] = None) -> str:
+    """Create system prompt based on role and department"""
+    
+    base_prompt = f"""You are an AI assistant for municipal Department of Public Works (DPW) operations.
+
+{get_role_context(role)}
+
+**STRICT SYSTEM INSTRUCTIONS - CRITICAL:**
+
+1. **SOURCE VERIFICATION (MANDATORY):**
+   - You may ONLY reference information from:
+     a) The user's uploaded documents
+     b) The pre-approved whitelisted sources
+   - NEVER use your general training knowledge
+   - NEVER make assumptions or provide information not explicitly found in these sources
+   - If information is not in the uploaded documents or whitelisted sources, you MUST say: "I cannot find this information in the provided documents or approved sources."
+
+2. **CITATION REQUIREMENTS:**
+   - ALWAYS cite your sources with [Source: filename/URL]
+   - For uploaded documents: [Source: document_name.pdf, page X]
+   - For whitelisted sources: [Source: URL]
+   - Every factual claim must have a citation
+
+3. **PROHIBITED ACTIONS:**
+   - Do NOT fabricate or "hallucinate" information
+   - Do NOT use general knowledge not verified in provided sources
+   - Do NOT make assumptions about local regulations unless explicitly stated in documents
+   - Do NOT provide legal advice (suggest consulting legal counsel)
+
+4. **RESPONSE FORMAT:**
+   - Start with a direct answer if found in sources
+   - Provide relevant citations
+   - If information is incomplete, state what is missing
+   - Suggest which whitelisted sources might contain the information
+
+5. **UNCERTAINTY HANDLING:**
+   - If unsure, say "I'm not certain based on the provided documents"
+   - Offer to search specific whitelisted sources
+   - Never guess or approximate when precision is required
+
+"""
+
+    if department:
+        dept_prompt = get_department_prompt(department)
+        if dept_prompt:
+            base_prompt += f"\n**DEPARTMENT-SPECIFIC CONTEXT:**\n{dept_prompt}\n"
+    
+    return base_prompt
+
+def generate_mock_response(query: str, context: str, system_prompt: str) -> str:
+    """Generate mock AI response (replace with actual LLM call)"""
+    
+    # This is a placeholder - integrate your actual LLM here
+    response = f"""Based on the provided documents and whitelisted sources:
+
+**Answer:** I can help you with "{query}".
+
+**Context Used:**
+{context[:500]}...
+
+**Sources Referenced:**
+- [Source: Uploaded Document]
+- [Source: Relevant whitelisted URL]
+
+**Note:** This is a demonstration response. In production, this would be generated by your LLM with strict adherence to the system prompt requiring source verification.
+
+**System Prompt Applied:**
+{system_prompt[:200]}...
+
+---
+*Remember: All responses must cite sources from uploaded documents or whitelisted URLs only.*
+"""
+    
+    return response
+
+# ============================================================================
+# API ENDPOINTS
+# ============================================================================
+
+@app.post("/upload")
+async def upload_document(file: UploadFile = File(...)):
+    """Upload and process PDF document"""
+    
+    if not file.filename.endswith('.pdf'):
+        raise HTTPException(status_code=400, detail="Only PDF files are supported")
+    
+    # Read file
+    content = await file.read()
+    
+    # Extract text
+    text = extract_text_from_pdf(content)
+    
+    # Create session
+    import uuid
+    session_id = str(uuid.uuid4())
+    
+    # Store in session
+    sessions[session_id] = {
+        "filename": file.filename,
+        "text": text,
+        "uploaded_at": "timestamp_here"
+    }
+    
+    # Count pages
+    pdf_reader = PyPDF2.PdfReader(io.BytesIO(content))
+    page_count = len(pdf_reader.pages)
+    
+    return UploadResponse(
+        session_id=session_id,
+        filename=file.filename,
+        pages=page_count,
+        message=f"Successfully uploaded {file.filename} ({page_count} pages)"
+    )
+
+@app.post("/query")
+async def query_documents(request: QueryRequest):
+    """Query uploaded documents with AI"""
+    
+    # Check if session exists
+    if request.session_id not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found. Please upload a document first.")
+    
+    # Get document context
+    session_data = sessions[request.session_id]
+    document_text = session_data["text"]
+    
+    # Create system prompt
+    system_prompt = create_system_prompt(request.role, request.department)
+    
+    # Generate response (replace with actual LLM call)
+    response = generate_mock_response(request.query, document_text, system_prompt)
+    
+    return JSONResponse({
+        "answer": response,
+        "session_id": request.session_id,
+        "sources_used": ["uploaded_document", "whitelisted_urls"]
+    })
+
+@app.get("/roles")
+async def get_roles():
+    """Get list of available job roles"""
+    return JSONResponse(get_role_list())
+
+@app.get("/departments")
+async def get_departments():
+    """Get list of available departments"""
+    return JSONResponse(get_all_departments())
+
+@app.get("/whitelisted-sources")
+async def get_sources():
+    """Get list of whitelisted sources"""
+    return JSONResponse(get_whitelisted_sources())
+
+@app.post("/custom-url/add")
+async def add_custom_url(request: CustomURLRequest):
+    """Add custom URL to session whitelist"""
+    if request.session_id not in session_custom_urls:
+        session_custom_urls[request.session_id] = []
+    
+    # Validate URL format
+    parsed = urlparse(request.url)
+    if not parsed.scheme or not parsed.netloc:
+        raise HTTPException(status_code=400, detail="Invalid URL format")
+    
+    # Add to session
+    if request.url not in session_custom_urls[request.session_id]:
+        session_custom_urls[request.session_id].append(request.url)
+    
+    return JSONResponse({
+        "message": "URL added successfully",
+        "url": request.url,
+        "session_id": request.session_id
+    })
+
+@app.get("/custom-url/list/{session_id}")
+async def list_custom_urls(session_id: str):
+    """List custom URLs for session"""
+    urls = session_custom_urls.get(session_id, [])
+    return JSONResponse({"session_id": session_id, "custom_urls": urls})
+
+@app.post("/custom-url/remove")
+async def remove_custom_url(request: CustomURLRequest):
+    """Remove custom URL from session whitelist"""
+    if request.session_id in session_custom_urls:
+        if request.url in session_custom_urls[request.session_id]:
+            session_custom_urls[request.session_id].remove(request.url)
+            return JSONResponse({"message": "URL removed successfully"})
+    
+    raise HTTPException(status_code=404, detail="URL not found in session")
+
+# ============================================================================
+# HTML FRONTEND
+# ============================================================================
+
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PipeWrench AI - Municipal DPW Knowledge Capture</title>
+    <title>DPW Knowledge Capture System</title>
     <style>
         * {
             margin: 0;
@@ -60,13 +737,13 @@ HTML_TEMPLATE = """
             max-width: 1200px;
             margin: 0 auto;
             background: white;
-            border-radius: 16px;
+            border-radius: 20px;
             box-shadow: 0 20px 60px rgba(0,0,0,0.3);
             overflow: hidden;
         }
         
         .header {
-            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             padding: 30px;
             text-align: center;
@@ -88,945 +765,602 @@ HTML_TEMPLATE = """
         
         .section {
             margin-bottom: 30px;
-            padding: 20px;
-            background: #f8fafc;
-            border-radius: 12px;
-            border: 1px solid #e2e8f0;
         }
         
-        .section h3 {
-            color: #1e293b;
+        .section-title {
+            font-size: 1.5em;
+            color: #667eea;
             margin-bottom: 15px;
-            font-size: 1.3em;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
         }
         
-        .form-group {
-            margin-bottom: 15px;
-        }
-        
-        label {
-            display: block;
-            margin-bottom: 8px;
-            color: #475569;
-            font-weight: 500;
-        }
-        
-        select, input[type="text"], input[type="url"], textarea {
-            width: 100%;
-            padding: 12px;
-            border: 2px solid #e2e8f0;
-            border-radius: 8px;
-            font-size: 1em;
-            transition: border-color 0.3s;
-        }
-        
-        select:focus, input:focus, textarea:focus {
-            outline: none;
-            border-color: #3b82f6;
-        }
-        
-        textarea {
-            min-height: 120px;
-            resize: vertical;
-            font-family: inherit;
-        }
-        
-        .button {
-            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-            color: white;
-            padding: 14px 28px;
-            border: none;
-            border-radius: 8px;
-            font-size: 1em;
-            font-weight: 600;
-            cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
-        
-        .button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(59, 130, 246, 0.3);
-        }
-        
-        .button:active {
-            transform: translateY(0);
-        }
-        
-        .button:disabled {
-            background: #94a3b8;
-            cursor: not-allowed;
-            transform: none;
-        }
-        
-        .file-upload {
-            border: 2px dashed #cbd5e1;
-            border-radius: 8px;
-            padding: 30px;
+        .upload-area {
+            border: 3px dashed #667eea;
+            border-radius: 10px;
+            padding: 40px;
             text-align: center;
+            background: #f8f9ff;
             cursor: pointer;
             transition: all 0.3s;
         }
         
-        .file-upload:hover {
-            border-color: #3b82f6;
-            background: #f1f5f9;
+        .upload-area:hover {
+            background: #e8ebff;
+            border-color: #764ba2;
         }
         
-        .file-upload.dragover {
-            border-color: #3b82f6;
-            background: #dbeafe;
+        .upload-area.dragover {
+            background: #d8dbff;
+            border-color: #764ba2;
         }
         
-        #fileList {
+        input[type="file"] {
+            display: none;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        select, input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1em;
+            margin-bottom: 15px;
+            transition: border-color 0.3s;
+        }
+        
+        select:focus, input[type="text"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .query-area {
+            display: flex;
+            gap: 10px;
             margin-top: 15px;
         }
         
-        .file-item {
-            background: white;
-            padding: 12px;
-            border-radius: 6px;
-            margin-bottom: 8px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border: 1px solid #e2e8f0;
+        .query-input {
+            flex: 1;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 25px;
+            font-size: 1em;
         }
         
-        .response-box {
-            background: white;
-            border: 2px solid #e2e8f0;
-            border-radius: 8px;
+        .response-area {
+            background: #f8f9ff;
+            border-radius: 10px;
             padding: 20px;
-            margin-top: 20px;
             min-height: 200px;
-            max-height: 600px;
-            overflow-y: auto;
+            margin-top: 20px;
+            white-space: pre-wrap;
+            line-height: 1.6;
         }
         
-        .loading {
-            text-align: center;
-            color: #64748b;
-            padding: 40px;
-        }
-        
-        .spinner {
-            border: 3px solid #f3f4f6;
-            border-top: 3px solid #3b82f6;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 15px;
-        }
-        
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        
-        .alert {
-            padding: 12px 16px;
+        .status {
+            padding: 15px;
             border-radius: 8px;
             margin-bottom: 15px;
+            display: none;
         }
         
-        .alert-info {
-            background: #dbeafe;
-            color: #1e40af;
-            border: 1px solid #93c5fd;
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
         }
         
-        .alert-success {
-            background: #d1fae5;
-            color: #065f46;
-            border: 1px solid #6ee7b7;
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
         }
         
-        .alert-warning {
-            background: #fef3c7;
-            color: #92400e;
-            border: 1px solid #fcd34d;
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
         }
         
         .footer {
-            background: #f8fafc;
+            background: #f8f9ff;
             padding: 20px 30px;
-            border-top: 1px solid #e2e8f0;
+            border-top: 2px solid #e0e0e0;
+            font-size: 0.9em;
+            color: #666;
+        }
+        
+        .footer-title {
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 10px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
         
         .footer-content {
-            max-width: 1200px;
-            margin: 0 auto;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
         }
         
-        .sources-toggle {
-            cursor: pointer;
-            color: #3b82f6;
-            font-weight: 600;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-        }
-        
-        .sources-toggle:hover {
-            color: #2563eb;
-        }
-        
-        .sources-list {
-            display: none;
-            margin-top: 15px;
-            padding: 15px;
-            background: white;
-            border-radius: 8px;
-            border: 1px solid #e2e8f0;
-            max-height: 300px;
+        .footer-content.expanded {
+            max-height: 500px;
             overflow-y: auto;
         }
         
-        .sources-list.show {
-            display: block;
+        .source-list {
+            columns: 2;
+            column-gap: 20px;
+            margin-top: 10px;
         }
         
         .source-item {
-            padding: 8px 0;
-            border-bottom: 1px solid #f1f5f9;
-        }
-        
-        .source-item:last-child {
-            border-bottom: none;
+            break-inside: avoid;
+            margin-bottom: 8px;
+            font-size: 0.85em;
         }
         
         .source-item a {
-            color: #3b82f6;
+            color: #667eea;
             text-decoration: none;
-            word-break: break-all;
         }
         
         .source-item a:hover {
             text-decoration: underline;
         }
         
+        .custom-url-section {
+            background: #fff9e6;
+            border: 2px solid #ffd700;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        
+        .custom-url-list {
+            margin-top: 15px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
         .custom-url-item {
-            background: white;
-            padding: 12px;
-            border: 1px solid #e2e8f0;
-            border-radius: 6px;
-            margin-bottom: 10px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-        }
-        
-        .custom-url-info {
-            flex: 1;
-        }
-        
-        .custom-url-url {
-            font-weight: 500;
-            color: #2563eb;
-            word-break: break-all;
-            margin-bottom: 4px;
-        }
-        
-        .custom-url-desc {
-            font-size: 0.85em;
-            color: #666;
-            margin-bottom: 4px;
-        }
-        
-        .custom-url-meta {
-            font-size: 0.75em;
-            color: #999;
+            padding: 8px;
+            background: white;
+            border-radius: 5px;
+            margin-bottom: 5px;
         }
         
         .remove-btn {
-            background: #dc2626;
+            background: #dc3545;
             color: white;
             border: none;
-            padding: 8px 16px;
-            border-radius: 6px;
+            padding: 5px 15px;
+            border-radius: 15px;
             cursor: pointer;
             font-size: 0.9em;
-            margin-left: 10px;
         }
         
         .remove-btn:hover {
-            background: #b91c1c;
+            background: #c82333;
         }
         
-        .checkbox-label {
-            display: flex;
-            align-items: center;
-            cursor: pointer;
-            margin-bottom: 10px;
-        }
-        
-        .checkbox-label input[type="checkbox"] {
-            width: auto;
-            margin-right: 8px;
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .source-list {
+                columns: 1;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>🔧 PipeWrench AI</h1>
-            <p>Municipal DPW Knowledge Capture System</p>
+            <h1>🏗️ DPW Knowledge Capture System</h1>
+            <p>AI-Powered Municipal Infrastructure Knowledge Base</p>
         </div>
         
         <div class="content">
-            <!-- Role Selection -->
-            <div class="section">
-                <h3>👤 Select Your Role</h3>
-                <div class="form-group">
-                    <select id="roleSelect" onchange="updateRoleContext()">
-                        <option value="">-- Select Your Role --</option>
-                    </select>
-                </div>
-                <div id="roleContext" style="display: none; margin-top: 10px; padding: 12px; background: #dbeafe; border-radius: 6px; color: #1e40af;">
-                </div>
-            </div>
+            <div id="status" class="status"></div>
             
-            <!-- Custom URL Whitelist -->
+            <!-- Step 1: Upload Document -->
             <div class="section">
-                <h3>🔗 Custom URL Whitelist</h3>
-                <p style="font-size: 0.9em; color: #666; margin-bottom: 15px;">
-                    Add your organization's internal documentation or additional trusted sources
-                </p>
-                
-                <!-- Add URL Form -->
-                <div style="background: white; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #e2e8f0;">
-                    <div class="form-group">
-                        <input type="url" id="customUrl" placeholder="https://example.com/docs" 
-                               style="margin-bottom: 10px;">
-                    </div>
-                    <div class="form-group">
-                        <input type="text" id="customUrlDesc" placeholder="Description (optional)">
-                    </div>
-                    <div class="form-group">
-                        <label class="checkbox-label">
-                            <input type="checkbox" id="includeChildren" checked>
-                            <span>Include child pages (e.g., /docs/page1, /docs/page2)</span>
-                        </label>
-                    </div>
-                    <button onclick="addCustomUrl()" class="button" style="width: 100%;">
-                        ➕ Add Custom URL
+                <h2 class="section-title">📄 Step 1: Upload Your Document</h2>
+                <div class="upload-area" id="uploadArea">
+                    <p style="font-size: 3em; margin-bottom: 10px;">📁</p>
+                    <p style="font-size: 1.2em; margin-bottom: 10px;">Drag & Drop PDF Here</p>
+                    <p style="color: #666; margin-bottom: 15px;">or</p>
+                    <button class="btn" onclick="document.getElementById('fileInput').click()">
+                        Choose File
                     </button>
-                </div>
-                
-                <!-- Custom URLs List -->
-                <div id="customUrlsList" style="max-height: 250px; overflow-y: auto;">
-                    <p style="color: #999; text-align: center; padding: 20px;">Loading custom URLs...</p>
+                    <input type="file" id="fileInput" accept=".pdf" onchange="handleFileSelect(event)">
                 </div>
             </div>
             
-            <!-- Document Upload -->
-            <div class="section">
-                <h3>📄 Upload Documents</h3>
-                <div class="alert alert-info">
-                    <strong>📌 Required:</strong> Upload your documents first before asking questions
+            <!-- Step 2: Configure Query -->
+            <div class="section" id="querySection" style="display: none;">
+                <h2 class="section-title">⚙️ Step 2: Configure Your Query</h2>
+                
+                <div class="grid">
+                    <div>
+                        <label><strong>Your Role:</strong></label>
+                        <select id="roleSelect">
+                            <option value="general">General DPW Staff</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label><strong>Department:</strong></label>
+                        <select id="departmentSelect">
+                            <option value="">Select Department (Optional)</option>
+                        </select>
+                    </div>
                 </div>
-                <div class="file-upload" id="dropZone">
-                    <div style="font-size: 3em; margin-bottom: 10px;">📁</div>
-                    <p style="font-size: 1.1em; margin-bottom: 8px;">Drag & drop files here or click to browse</p>
-                    <p style="font-size: 0.9em; color: #64748b;">Supports PDF, TXT, and other document formats</p>
-                    <input type="file" id="fileInput" multiple style="display: none;">
+                
+                <!-- Custom URL Section -->
+                <div class="custom-url-section">
+                    <h3 style="color: #ff8c00; margin-bottom: 10px;">🔗 Add Your Organization's URLs</h3>
+                    <p style="font-size: 0.9em; color: #666; margin-bottom: 15px;">
+                        Add additional trusted sources specific to your organization
+                    </p>
+                    <div style="display: flex; gap: 10px;">
+                        <input type="text" id="customUrlInput" placeholder="https://your-organization.com/resource" 
+                               style="margin-bottom: 0;">
+                        <button class="btn" onclick="addCustomUrl()">Add URL</button>
+                    </div>
+                    <div id="customUrlList" class="custom-url-list"></div>
                 </div>
-                <div id="fileList"></div>
-                <button onclick="uploadDocuments()" class="button" style="width: 100%; margin-top: 15px;" id="uploadBtn" disabled>
-                    📤 Upload Documents
-                </button>
+                
+                <div class="query-area">
+                    <input type="text" id="queryInput" class="query-input" 
+                           placeholder="Ask a question about your document..." 
+                           onkeypress="handleQueryKeyPress(event)">
+                    <button class="btn" onclick="submitQuery()">Ask Question</button>
+                </div>
             </div>
             
-            <!-- Query Section -->
-            <div class="section">
-                <h3>💬 Ask a Question</h3>
-                <div class="alert alert-warning" id="uploadWarning">
-                    ⚠️ Please upload documents before asking questions
-                </div>
-                <div class="form-group">
-                    <label for="queryInput">Your Question:</label>
-                    <textarea id="queryInput" placeholder="Ask about compliance, regulations, standards, or best practices..." disabled></textarea>
-                </div>
-                <button onclick="submitQuery()" class="button" style="width: 100%;" id="queryBtn" disabled>
-                    🔍 Get Answer
-                </button>
-                
-                <div id="responseBox" class="response-box" style="display: none;">
-                    <div id="responseContent"></div>
+            <!-- Step 3: Response -->
+            <div class="section" id="responseSection" style="display: none;">
+                <h2 class="section-title">💡 Response</h2>
+                <div id="responseArea" class="response-area">
+                    Your answer will appear here...
                 </div>
             </div>
         </div>
         
         <div class="footer">
-            <div class="footer-content">
-                <div style="margin-bottom: 10px;">
-                    <strong>🔒 Verified Sources Only:</strong> All responses reference approved federal, state, and custom sources
+            <div class="footer-title" onclick="toggleFooter()">
+                📚 Federal Whitelisted Sources (24 sources) 
+                <span id="footerArrow">▼</span>
+            </div>
+            <div id="footerContent" class="footer-content">
+                <div class="source-list">
+                    <div class="source-item">• <a href="https://www.acquisition.gov/far/part-36" target="_blank">FAR Part 36</a></div>
+                    <div class="source-item">• <a href="https://highways.dot.gov/federal-lands/specs" target="_blank">FHWA Standards</a></div>
+                    <div class="source-item">• <a href="https://www.osha.gov/laws-regs/regulations/standardnumber/1926" target="_blank">OSHA 29 CFR 1926</a></div>
+                    <div class="source-item">• <a href="https://www.osha.gov/construction" target="_blank">OSHA Construction</a></div>
+                    <div class="source-item">• <a href="https://www.epa.gov/eg/construction-and-development-effluent-guidelines" target="_blank">EPA 40 CFR 450</a></div>
+                    <div class="source-item">• <a href="https://www.epa.gov/laws-regulations" target="_blank">EPA Laws & Regulations</a></div>
+                    <div class="source-item">• <a href="https://www.transportation.gov/roadways-and-bridges" target="_blank">US DOT Roads & Bridges</a></div>
+                    <div class="source-item">• <a href="https://highways.dot.gov/fed-aid-essentials/videos/project-development/design-project-geometric-design-requirements" target="_blank">FHWA Geometric Design</a></div>
+                    <div class="source-item">• <a href="https://global.iccsafe.org/international-codes-and-standards/" target="_blank">ICC I-Codes</a></div>
+                    <div class="source-item">• <a href="https://www.asce.org/publications-and-news/codes-and-standards" target="_blank">ASCE Standards</a></div>
+                    <div class="source-item">• <a href="https://www.asme.org/codes-standards" target="_blank">ASME Codes</a></div>
+                    <div class="source-item">• <a href="https://www.fhwa.dot.gov/programadmin/121205.cfm" target="_blank">Brooks Act</a></div>
+                    <div class="source-item">• <a href="https://www.acquisition.gov/far/subpart-36.6" target="_blank">FAR Subpart 36.6</a></div>
+                    <div class="source-item">• <a href="https://www.gsa.gov/real-estate/design-and-construction/facilities-standards-for-the-public-buildings-service" target="_blank">GSA Facilities Standards</a></div>
+                    <div class="source-item">• <a href="https://www.congress.gov/crs-product/R47666" target="_blank">Congressional Research</a></div>
+                    <div class="source-item">• <a href="https://www.ansi.org" target="_blank">ANSI</a></div>
+                    <div class="source-item">• <a href="https://www.astm.org" target="_blank">ASTM International</a></div>
+                    <div class="source-item">• <a href="https://store.astm.org/products-services/standards-and-publications/standards/construction-standards.html" target="_blank">ASTM Construction</a></div>
+                    <div class="source-item">• <a href="https://www.nfpa.org/codes-and-standards" target="_blank">NFPA Codes</a></div>
+                    <div class="source-item">• <a href="https://codesonline.nfpa.org" target="_blank">NFPA Online</a></div>
+                    <div class="source-item">• <a href="https://www.apwa.org/resources/about-public-works/" target="_blank">APWA</a></div>
+                    <div class="source-item">• <a href="https://www.nist.gov" target="_blank">NIST</a></div>
+                    <div class="source-item">• <a href="https://www.epa.gov/sites/default/files/2015-10/documents/myerguide.pdf" target="_blank">EPA MYER Guide</a></div>
+                    <div class="source-item">• <a href="https://www.cem.va.gov/pdf/fedreqs.pdf" target="_blank">Federal Environmental Reqs</a></div>
                 </div>
-                <div class="sources-toggle" onclick="toggleSources()">
-                    <span id="sourcesToggleText">📚 View Federal Sources (24 sources)</span>
-                    <span id="sourcesToggleIcon">▼</span>
-                </div>
-                <div class="sources-list" id="sourcesList">
-                    <div style="font-weight: 600; margin-bottom: 10px; color: #1e293b;">Federal Compliance Sources:</div>
-                    <div class="source-item"><a href="https://www.acquisition.gov/far/part-36" target="_blank">Federal Acquisition Regulation (FAR) - Part 36</a></div>
-                    <div class="source-item"><a href="https://highways.dot.gov/federal-lands/specs" target="_blank">FHWA Standard Specifications FP-24</a></div>
-                    <div class="source-item"><a href="https://www.osha.gov/laws-regs/regulations/standardnumber/1926" target="_blank">OSHA 29 CFR Part 1926</a></div>
-                    <div class="source-item"><a href="https://www.osha.gov/construction" target="_blank">OSHA Construction Industry Portal</a></div>
-                    <div class="source-item"><a href="https://www.epa.gov/eg/construction-and-development-effluent-guidelines" target="_blank">EPA 40 CFR Part 450</a></div>
-                    <div class="source-item"><a href="https://www.epa.gov/laws-regulations" target="_blank">EPA Laws & Regulations</a></div>
-                    <div class="source-item"><a href="https://www.transportation.gov/roadways-and-bridges" target="_blank">USDOT Roadways and Bridges</a></div>
-                    <div class="source-item"><a href="https://global.iccsafe.org/international-codes-and-standards/" target="_blank">International Code Council (ICC)</a></div>
-                    <div class="source-item"><a href="https://www.asce.org/publications-and-news/codes-and-standards" target="_blank">ASCE Codes and Standards</a></div>
-                    <div class="source-item"><a href="https://www.asme.org/codes-standards" target="_blank">ASME Codes & Standards</a></div>
-                    <div class="source-item"><a href="https://www.fhwa.dot.gov/programadmin/121205.cfm" target="_blank">FHWA Program Administration</a></div>
-                    <div class="source-item"><a href="https://www.gsa.gov/real-estate/design-and-construction/facilities-standards-for-the-public-buildings-service" target="_blank">GSA Facilities Standards</a></div>
-                    <div class="source-item"><a href="https://www.congress.gov/crs-product/R47666" target="_blank">Congressional Research Service</a></div>
-                    <div class="source-item"><a href="https://www.ansi.org" target="_blank">ANSI Standards</a></div>
-                    <div class="source-item"><a href="https://www.astm.org" target="_blank">ASTM International</a></div>
-                    <div class="source-item"><a href="https://store.astm.org/products-services/standards-and-publications/standards/construction-standards.html" target="_blank">ASTM Construction Standards</a></div>
-                    <div class="source-item"><a href="https://www.nfpa.org/codes-and-standards" target="_blank">NFPA Codes and Standards</a></div>
-                    <div class="source-item"><a href="https://codesonline.nfpa.org" target="_blank">NFPA Codes Online</a></div>
-                    <div class="source-item"><a href="https://www.apwa.org/resources/about-public-works/" target="_blank">APWA Resources</a></div>
-                    <div class="source-item"><a href="https://www.nist.gov" target="_blank">NIST Standards</a></div>
-                    <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #e2e8f0; font-size: 0.9em; color: #64748b;">
-                        Plus 102 state-specific DOT and licensing board sources
-                    </div>
-                </div>
+                <p style="margin-top: 15px; font-size: 0.85em; color: #999;">
+                    Plus 102 state-specific DOT and professional licensing sources
+                </p>
             </div>
         </div>
     </div>
     
     <script>
-        let sessionId = 'session_' + Date.now();
-        let uploadedFiles = [];
-        let documentsUploaded = false;
+        let sessionId = null;
         
-        // Load roles on page load
-        async function loadRoles() {
+        // Load roles and departments
+        async function loadConfiguration() {
             try {
-                const response = await fetch('/api/roles');
-                const data = await response.json();
-                const select = document.getElementById('roleSelect');
+                const rolesResponse = await fetch('/roles');
+                const roles = await rolesResponse.json();
+                const roleSelect = document.getElementById('roleSelect');
+                roleSelect.innerHTML = roles.map(role => 
+                    `<option value="${role.id}">${role.name}</option>`
+                ).join('');
                 
-                data.roles.forEach(role => {
-                    const option = document.createElement('option');
-                    option.value = role.id;
-                    option.textContent = role.name;
-                    select.appendChild(option);
-                });
+                const deptsResponse = await fetch('/departments');
+                const depts = await deptsResponse.json();
+                const deptSelect = document.getElementById('departmentSelect');
+                deptSelect.innerHTML = '<option value="">Select Department (Optional)</option>' +
+                    depts.map(dept => 
+                        `<option value="${dept.id}">${dept.name}</option>`
+                    ).join('');
             } catch (error) {
-                console.error('Error loading roles:', error);
+                console.error('Error loading configuration:', error);
             }
         }
         
-        function updateRoleContext() {
-            const select = document.getElementById('roleSelect');
-            const contextDiv = document.getElementById('roleContext');
-            
-            if (select.value) {
-                const selectedOption = select.options[select.selectedIndex];
-                contextDiv.textContent = '✓ Role selected: ' + selectedOption.textContent;
-                contextDiv.style.display = 'block';
-            } else {
-                contextDiv.style.display = 'none';
-            }
-        }
+        // Drag and drop handlers
+        const uploadArea = document.getElementById('uploadArea');
         
-        // Load custom URLs
-        async function loadCustomUrls() {
-            try {
-                const response = await fetch('/api/custom-urls');
-                const data = await response.json();
-                displayCustomUrls(data.custom_urls || []);
-            } catch (error) {
-                console.error('Error loading custom URLs:', error);
-                document.getElementById('customUrlsList').innerHTML = 
-                    '<p style="color: #999; text-align: center; padding: 20px;">No custom URLs added yet</p>';
-            }
-        }
-        
-        function displayCustomUrls(urls) {
-            const container = document.getElementById('customUrlsList');
-            
-            if (urls.length === 0) {
-                container.innerHTML = '<p style="color: #999; text-align: center; padding: 20px;">No custom URLs added yet</p>';
-                return;
-            }
-            
-            container.innerHTML = urls.map(entry => `
-                <div class="custom-url-item">
-                    <div class="custom-url-info">
-                        <div class="custom-url-url">${entry.url}</div>
-                        ${entry.description ? `<div class="custom-url-desc">${entry.description}</div>` : ''}
-                        <div class="custom-url-meta">
-                            ${entry.include_children ? '✓ Includes child pages' : '○ Exact URL only'}
-                        </div>
-                    </div>
-                    <button onclick="removeCustomUrl('${entry.url.replace(/'/g, "\\'")}\')" class="remove-btn">
-                        Remove
-                    </button>
-                </div>
-            `).join('');
-        }
-        
-        async function addCustomUrl() {
-            const url = document.getElementById('customUrl').value.trim();
-            const description = document.getElementById('customUrlDesc').value.trim();
-            const includeChildren = document.getElementById('includeChildren').checked;
-            
-            if (!url) {
-                alert('Please enter a URL');
-                return;
-            }
-            
-            try {
-                const response = await fetch('/api/custom-urls/add', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        url: url,
-                        description: description,
-                        include_children: includeChildren
-                    })
-                });
-                
-                const result = await response.json();
-                
-                if (result.success) {
-                    document.getElementById('customUrl').value = '';
-                    document.getElementById('customUrlDesc').value = '';
-                    document.getElementById('includeChildren').checked = true;
-                    
-                    await loadCustomUrls();
-                    alert('✅ URL added successfully!');
-                } else {
-                    alert('❌ ' + result.message);
-                }
-            } catch (error) {
-                console.error('Error adding URL:', error);
-                alert('❌ Failed to add URL');
-            }
-        }
-        
-        async function removeCustomUrl(url) {
-            if (!confirm(`Remove this URL from whitelist?\\n\\n${url}`)) {
-                return;
-            }
-            
-            try {
-                const response = await fetch('/api/custom-urls/remove', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({url: url})
-                });
-                
-                const result = await response.json();
-                
-                if (result.success) {
-                    await loadCustomUrls();
-                    alert('✅ URL removed successfully!');
-                } else {
-                    alert('❌ ' + result.message);
-                }
-            } catch (error) {
-                console.error('Error removing URL:', error);
-                alert('❌ Failed to remove URL');
-            }
-        }
-        
-        function toggleSources() {
-            const list = document.getElementById('sourcesList');
-            const icon = document.getElementById('sourcesToggleIcon');
-            
-            if (list.classList.contains('show')) {
-                list.classList.remove('show');
-                icon.textContent = '▼';
-            } else {
-                list.classList.add('show');
-                icon.textContent = '▲';
-            }
-        }
-        
-        // File upload handling
-        const dropZone = document.getElementById('dropZone');
-        const fileInput = document.getElementById('fileInput');
-        
-        dropZone.addEventListener('click', () => fileInput.click());
-        
-        dropZone.addEventListener('dragover', (e) => {
+        uploadArea.addEventListener('dragover', (e) => {
             e.preventDefault();
-            dropZone.classList.add('dragover');
+            uploadArea.classList.add('dragover');
         });
         
-        dropZone.addEventListener('dragleave', () => {
-            dropZone.classList.remove('dragover');
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
         });
         
-        dropZone.addEventListener('drop', (e) => {
+        uploadArea.addEventListener('drop', (e) => {
             e.preventDefault();
-            dropZone.classList.remove('dragover');
-            handleFiles(e.dataTransfer.files);
-        });
-        
-        fileInput.addEventListener('change', (e) => {
-            handleFiles(e.target.files);
-        });
-        
-        function handleFiles(files) {
-            uploadedFiles = Array.from(files);
-            displayFiles();
-            document.getElementById('uploadBtn').disabled = uploadedFiles.length === 0;
-        }
-        
-        function displayFiles() {
-            const fileList = document.getElementById('fileList');
-            if (uploadedFiles.length === 0) {
-                fileList.innerHTML = '';
-                return;
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
             }
-            
-            fileList.innerHTML = '<div style="margin-top: 15px;"><strong>Selected Files:</strong></div>' +
-                uploadedFiles.map((file, index) => `
-                    <div class="file-item">
-                        <span>📄 ${file.name} (${(file.size / 1024).toFixed(1)} KB)</span>
-                        <button onclick="removeFile(${index})" style="background: #ef4444; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer;">Remove</button>
-                    </div>
-                `).join('');
+        });
+        
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                handleFile(file);
+            }
         }
         
-        function removeFile(index) {
-            uploadedFiles.splice(index, 1);
-            displayFiles();
-            document.getElementById('uploadBtn').disabled = uploadedFiles.length === 0;
-        }
-        
-        async function uploadDocuments() {
-            if (uploadedFiles.length === 0) {
-                alert('Please select files to upload');
+        async function handleFile(file) {
+            if (!file.name.endsWith('.pdf')) {
+                showStatus('Please upload a PDF file', 'error');
                 return;
             }
             
             const formData = new FormData();
-            formData.append('session_id', sessionId);
-            uploadedFiles.forEach(file => {
-                formData.append('files', file);
-            });
+            formData.append('file', file);
             
-            document.getElementById('uploadBtn').disabled = true;
-            document.getElementById('uploadBtn').textContent = '⏳ Uploading...';
+            showStatus('Uploading and processing document...', 'info');
             
             try {
-                const response = await fetch('/api/upload', {
+                const response = await fetch('/upload', {
                     method: 'POST',
                     body: formData
                 });
                 
-                const result = await response.json();
+                const data = await response.json();
                 
-                if (result.success) {
-                    documentsUploaded = true;
-                    document.getElementById('uploadWarning').style.display = 'none';
-                    document.getElementById('queryInput').disabled = false;
-                    document.getElementById('queryBtn').disabled = false;
-                    alert('✅ Documents uploaded successfully!');
+                if (response.ok) {
+                    sessionId = data.session_id;
+                    showStatus(`✅ ${data.message}`, 'success');
+                    document.getElementById('querySection').style.display = 'block';
+                    document.getElementById('responseSection').style.display = 'block';
+                    loadCustomUrls();
                 } else {
-                    alert('❌ Upload failed: ' + result.message);
+                    showStatus(`Error: ${data.detail}`, 'error');
                 }
             } catch (error) {
-                console.error('Upload error:', error);
-                alert('❌ Upload failed');
-            } finally {
-                document.getElementById('uploadBtn').disabled = false;
-                document.getElementById('uploadBtn').textContent = '📤 Upload Documents';
+                showStatus(`Error uploading file: ${error.message}`, 'error');
             }
         }
         
         async function submitQuery() {
             const query = document.getElementById('queryInput').value.trim();
-            const role = document.getElementById('roleSelect').value;
-            
-            if (!documentsUploaded) {
-                alert('Please upload documents first');
-                return;
-            }
-            
             if (!query) {
-                alert('Please enter a question');
+                showStatus('Please enter a question', 'error');
                 return;
             }
             
-            if (!role) {
-                alert('Please select your role');
+            if (!sessionId) {
+                showStatus('Please upload a document first', 'error');
                 return;
             }
             
-            const responseBox = document.getElementById('responseBox');
-            const responseContent = document.getElementById('responseContent');
+            const role = document.getElementById('roleSelect').value;
+            const department = document.getElementById('departmentSelect').value;
             
-            responseBox.style.display = 'block';
-            responseContent.innerHTML = `
-                <div class="loading">
-                    <div class="spinner"></div>
-                    <p>Processing your query...</p>
-                </div>
-            `;
-            
-            document.getElementById('queryBtn').disabled = true;
+            showStatus('Processing your question...', 'info');
             
             try {
-                const response = await fetch('/api/query', {
+                const response = await fetch('/query', {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
                     body: JSON.stringify({
                         session_id: sessionId,
                         query: query,
-                        role: role
+                        role: role,
+                        department: department || null
                     })
                 });
                 
-                const result = await response.json();
+                const data = await response.json();
                 
-                if (result.success) {
-                    responseContent.innerHTML = `
-                        <div style="line-height: 1.6;">
-                            <div style="background: #f0fdf4; border-left: 4px solid #22c55e; padding: 12px; margin-bottom: 15px; border-radius: 4px;">
-                                <strong>✓ Response generated from verified sources</strong>
-                            </div>
-                            <div style="white-space: pre-wrap;">${result.answer}</div>
-                            ${result.sources && result.sources.length > 0 ? `
-                                <div style="margin-top: 20px; padding-top: 20px; border-top: 2px solid #e2e8f0;">
-                                    <strong>📚 Sources Referenced:</strong>
-                                    <ul style="margin-top: 10px;">
-                                        ${result.sources.map(src => `<li><a href="${src}" target="_blank" style="color: #3b82f6;">${src}</a></li>`).join('')}
-                                    </ul>
-                                </div>
-                            ` : ''}
-                        </div>
-                    `;
+                if (response.ok) {
+                    document.getElementById('responseArea').textContent = data.answer;
+                    showStatus('✅ Response generated', 'success');
                 } else {
-                    responseContent.innerHTML = `
-                        <div style="background: #fef2f2; border-left: 4px solid #ef4444; padding: 12px; border-radius: 4px; color: #991b1b;">
-                            <strong>❌ Error:</strong> ${result.message}
-                        </div>
-                    `;
+                    showStatus(`Error: ${data.detail}`, 'error');
                 }
             } catch (error) {
-                console.error('Query error:', error);
-                responseContent.innerHTML = `
-                    <div style="background: #fef2f2; border-left: 4px solid #ef4444; padding: 12px; border-radius: 4px; color: #991b1b;">
-                        <strong>❌ Error:</strong> Failed to process query
-                    </div>
-                `;
-            } finally {
-                document.getElementById('queryBtn').disabled = false;
+                showStatus(`Error: ${error.message}`, 'error');
             }
         }
         
-        // Initialize on page load
-        window.addEventListener('DOMContentLoaded', () => {
-            loadRoles();
-            loadCustomUrls();
-        });
+        function handleQueryKeyPress(event) {
+            if (event.key === 'Enter') {
+                submitQuery();
+            }
+        }
+        
+        async function addCustomUrl() {
+            const urlInput = document.getElementById('customUrlInput');
+            const url = urlInput.value.trim();
+            
+            if (!url) {
+                showStatus('Please enter a URL', 'error');
+                return;
+            }
+            
+            if (!sessionId) {
+                showStatus('Please upload a document first', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/custom-url/add', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        session_id: sessionId,
+                        url: url
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showStatus('✅ URL added successfully', 'success');
+                    urlInput.value = '';
+                    loadCustomUrls();
+                } else {
+                    showStatus(`Error: ${data.detail}`, 'error');
+                }
+            } catch (error) {
+                showStatus(`Error: ${error.message}`, 'error');
+            }
+        }
+        
+        async function loadCustomUrls() {
+            if (!sessionId) return;
+            
+            try {
+                const response = await fetch(`/custom-url/list/${sessionId}`);
+                const data = await response.json();
+                
+                const listDiv = document.getElementById('customUrlList');
+                if (data.custom_urls.length === 0) {
+                    listDiv.innerHTML = '<p style="color: #999; font-size: 0.9em; margin-top: 10px;">No custom URLs added yet</p>';
+                } else {
+                    listDiv.innerHTML = data.custom_urls.map(url => `
+                        <div class="custom-url-item">
+                            <span style="font-size: 0.9em;">${url}</span>
+                            <button class="remove-btn" onclick="removeCustomUrl('${url}')">Remove</button>
+                        </div>
+                    `).join('');
+                }
+            } catch (error) {
+                console.error('Error loading custom URLs:', error);
+            }
+        }
+        
+        async function removeCustomUrl(url) {
+            try {
+                const response = await fetch('/custom-url/remove', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        session_id: sessionId,
+                        url: url
+                    })
+                });
+                
+                if (response.ok) {
+                    showStatus('✅ URL removed', 'success');
+                    loadCustomUrls();
+                } else {
+                    showStatus('Error removing URL', 'error');
+                }
+            } catch (error) {
+                showStatus(`Error: ${error.message}`, 'error');
+            }
+        }
+        
+        function showStatus(message, type) {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = `status ${type}`;
+            status.style.display = 'block';
+            
+            if (type === 'success') {
+                setTimeout(() => {
+                    status.style.display = 'none';
+                }, 5000);
+            }
+        }
+        
+        function toggleFooter() {
+            const content = document.getElementById('footerContent');
+            const arrow = document.getElementById('footerArrow');
+            content.classList.toggle('expanded');
+            arrow.textContent = content.classList.contains('expanded') ? '▲' : '▼';
+        }
+        
+        // Initialize
+        loadConfiguration();
     </script>
 </body>
 </html>
 """
 
 @app.get("/", response_class=HTMLResponse)
-async def home():
+async def root():
     """Serve the main HTML interface"""
     return HTML_TEMPLATE
 
-@app.get("/api/roles")
-async def get_roles():
-    """Get list of available job roles"""
-    roles = get_role_list()
-    return {"roles": roles}
-
-@app.get("/api/custom-urls")
-async def get_custom_urls_endpoint():
-    """Get list of custom whitelisted URLs"""
-    custom_urls = get_custom_urls()
-    return {"custom_urls": custom_urls}
-
-@app.post("/api/custom-urls/add")
-async def add_custom_url_endpoint(request: Request):
-    """Add a new custom URL to whitelist"""
-    data = await request.json()
-    url = data.get("url", "").strip()
-    include_children = data.get("include_children", True)
-    description = data.get("description", "")
-    
-    if not url:
-        return {"success": False, "message": "URL is required"}
-    
-    result = add_custom_url(url, include_children, description)
-    return result
-
-@app.post("/api/custom-urls/remove")
-async def remove_custom_url_endpoint(request: Request):
-    """Remove a custom URL from whitelist"""
-    data = await request.json()
-    url = data.get("url", "").strip()
-    
-    if not url:
-        return {"success": False, "message": "URL is required"}
-    
-    result = remove_custom_url(url)
-    return result
-
-@app.post("/api/upload")
-async def upload_documents(request: Request):
-    """Handle document uploads"""
-    form = await request.form()
-    session_id = form.get("session_id")
-    files = form.getlist("files")
-    
-    if not session_id:
-        return JSONResponse({"success": False, "message": "Session ID required"}, status_code=400)
-    
-    if not files:
-        return JSONResponse({"success": False, "message": "No files uploaded"}, status_code=400)
-    
-    # Initialize session storage
-    if session_id not in sessions:
-        sessions[session_id] = {
-            "documents": [],
-            "document_texts": []
-        }
-    
-    # Process uploaded files
-    for file in files:
-        try:
-            content = await file.read()
-            
-            # Extract text based on file type
-            if file.filename.endswith('.pdf'):
-                text = extract_text_from_pdf(content)
-            elif file.filename.endswith('.txt'):
-                text = content.decode('utf-8')
-            else:
-                text = content.decode('utf-8', errors='ignore')
-            
-            sessions[session_id]["documents"].append({
-                "filename": file.filename,
-                "size": len(content),
-                "uploaded_at": datetime.now().isoformat()
-            })
-            
-            sessions[session_id]["document_texts"].append({
-                "filename": file.filename,
-                "text": text
-            })
-            
-        except Exception as e:
-            return JSONResponse({
-                "success": False,
-                "message": f"Error processing {file.filename}: {str(e)}"
-            }, status_code=500)
-    
-    return {
-        "success": True,
-        "message": f"Uploaded {len(files)} file(s)",
-        "files": [f.filename for f in files]
-    }
-
-@app.post("/api/query")
-async def process_query(request: Request):
-    """Process user query against uploaded documents"""
-    data = await request.json()
-    session_id = data.get("session_id")
-    query = data.get("query")
-    role = data.get("role")
-    
-    if not session_id or session_id not in sessions:
-        return {"success": False, "message": "No documents uploaded. Please upload documents first."}
-    
-    if not query:
-        return {"success": False, "message": "Query is required"}
-    
-    if not role:
-        return {"success": False, "message": "Role selection is required"}
-    
-    session_data = sessions[session_id]
-    
-    if not session_data.get("document_texts"):
-        return {"success": False, "message": "No documents found. Please upload documents first."}
-    
-    try:
-        # Get role context
-        role_context = get_role_context(role)
-        
-        # Simulate AI processing (replace with actual AI integration)
-        answer = generate_answer(query, session_data["document_texts"], role_context)
-        
-        # Extract and validate sources
-        sources = extract_sources(answer)
-        validated_sources = [src for src in sources if is_url_whitelisted(src)]
-        
-        return {
-            "success": True,
-            "answer": answer,
-            "sources": validated_sources,
-            "role": role
-        }
-        
-    except Exception as e:
-        return {"success": False, "message": f"Error processing query: {str(e)}"}
-
-def extract_text_from_pdf(pdf_content: bytes) -> str:
-    """Extract text from PDF file"""
-    try:
-        pdf_file = io.BytesIO(pdf_content)
-        pdf_reader = PyPDF2.PdfReader(pdf_file)
-        text = ""
-        for page in pdf_reader.pages:
-            text += page.extract_text() + "\\n"
-        return text
-    except Exception as e:
-        raise Exception(f"Failed to extract PDF text: {str(e)}")
-
-def generate_answer(query: str, documents: List[Dict], role_context: str) -> str:
-    """
-    Generate answer based on query and documents
-    This is a placeholder - integrate with your AI model here
-    """
-    # Combine document texts
-    combined_text = "\\n\\n".join([doc["text"] for doc in documents])
-    
-    # Placeholder response
-    answer = f"""Based on the uploaded documents and your role as {role_context}:
-
-{query}
-
-[This is a placeholder response. Integrate with your AI model (OpenAI, Anthropic, etc.) to generate actual responses based on:
-1. The user's query
-2. The uploaded document content
-3. The user's role context
-4. References to whitelisted sources only]
-
-The system will ensure all citations reference only approved federal, state, and custom whitelisted sources.
-
-Example sources that might be referenced:
-- https://www.osha.gov/construction
-- https://www.epa.gov/laws-regulations
-- https://www.fhwa.dot.gov/programadmin/121205.cfm
-"""
-    
-    return answer
-
-def extract_sources(text: str) -> List[str]:
-    """Extract URLs from text"""
-    import re
-    url_pattern = r'https?://[^\\s<>"{}|\\\\^`\\[\\]]+'
-    urls = re.findall(url_pattern, text)
-    return list(set(urls))
-
-@app.get("/health")
-async def health_check():
-    """Health check endpoint"""
-    return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+# ============================================================================
+# MAIN
+# ============================================================================
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
