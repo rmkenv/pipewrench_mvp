@@ -1,10 +1,10 @@
 from fastapi import FastAPI, Form, UploadFile, File, HTTPException, Request\
-from fastapi.responses import HTMLResponse, JSONResponse\
-from anthropic import Anthropic\
-import os\
-from datetime import datetime\
-from typing import Optional\
-import uuid\
+from fastapi.responses import HTMLResponse, JSONResponse
+from anthropic import Anthropic
+import os
+from datetime import datetime
+from typing import Optional
+import uuid
 import io
 
 # Import for file parsing
