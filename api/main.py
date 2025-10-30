@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Form, UploadFile, File, HTTPException, Request\
+from fastapi import FastAPI, Form, UploadFile, File, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from anthropic import Anthropic
 import os
