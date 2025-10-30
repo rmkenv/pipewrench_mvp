@@ -8,55 +8,48 @@ import uuid
 import io
 
 # Import for file parsing
+try:
+    from PyPDF2 import PdfReader
+except ImportError:
+    PdfReader = None
 
-try:\
-from PyPDF2 import PdfReader\
-except ImportError:\
-PdfReader = None
-
-try:\
-import docx\
-except ImportError:\
-docx = None
+try:
+    import docx
+except ImportError:
+    docx = None
 
 # Add path for local imports
-
-import sys\
-sys.path.insert(0, os.path.dirname(**file**))
+import sys
+sys.path.insert(0, os.path.dirname(__file__))
 
 # Import configurations
-
-from department_prompts_config import get_department_prompt, get_department_list, get_department_name\
-from job_roles_config import get_role_list, get_role_context\
+from department_prompts_config import get_department_prompt, get_department_list, get_department_name
+from job_roles_config import get_role_list, get_role_context
 from url_whitelist_config import is_url_whitelisted, get_whitelisted_sources, WHITELISTED_URLS
 
 app = FastAPI()
 
 # Initialize Anthropic client
-
 client = Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
 
 # Session storage (in production, use Redis or database)
-
 sessions = {}
 
 # Embedded HTML
+HTML_TEMPLATE = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PipeWrench AI - Municipal Knowledge Capture</title>
+<style>
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
 
-HTML_TEMPLATE = """\
-<!DOCTYPE html>\
-<html lang="en">\
-<head>\
-<meta charset="UTF-8">\
-<meta name="viewport" content="width=device-width, initial-scale=1.0">\
-<title>PipeWrench AI - Municipal Knowledge Capture</title>\
-<style>\
-\* {\
-margin: 0;\
-padding: 0;\
-box-sizing: border-box;\
-}
-
-```
     :root {
         --primary-blue: #1e40af;
         --secondary-blue: #3b82f6;
@@ -377,17 +370,14 @@ box-sizing: border-box;\
         }
     }
 </style>
-```
-
-</head>\
-<body>\
-<div class="container">\
-<header>\
-<h1>🔧 PipeWrench AI</h1>\
-<p>Preserving Institutional Knowledge in Public Works</p>\
+</head>
+<body>
+<div class="container">
+<header>
+<h1>🔧 PipeWrench AI</h1>
+<p>Preserving Institutional Knowledge in Public Works</p>
 </header>
 
-```
     <div class="tabs">
         <button class="tab-btn" data-tab="upload">Upload Documents</button>
         <button class="tab-btn active" data-tab="query">Ask Questions</button>
@@ -910,286 +900,268 @@ box-sizing: border-box;\
         }
     });
 </script>
-```
-
-</body>\
-</html>\
+</body>
+</html>
 """
 
-def extract_text_from_file(content: bytes, filename: str) -> str:\
-"""Extract text from various file formats"""
-
-```
-# Text files
-if filename.endswith('.txt'):
-    try:
-        return content.decode('utf-8')
-    except UnicodeDecodeError:
-        return content.decode('latin-1', errors='ignore')
-
-# PDF files
-elif filename.endswith('.pdf'):
-    if PdfReader is None:
-        raise HTTPException(status_code=400, detail="PDF support not available. Please install PyPDF2.")
+def extract_text_from_file(content: bytes, filename: str) -> str:
+    """Extract text from various file formats"""
     
-    try:
-        pdf_file = io.BytesIO(content)
-        pdf_reader = PdfReader(pdf_file)
-        text = ""
-        for page in pdf_reader.pages:
-            text += page.extract_text() + "\n"
-        return text
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to parse PDF: {str(e)}")
-
-# Word documents
-elif filename.endswith('.docx'):
-    if docx is None:
-        raise HTTPException(status_code=400, detail="Word document support not available. Please install python-docx.")
+    # Text files
+    if filename.endswith('.txt'):
+        try:
+            return content.decode('utf-8')
+        except UnicodeDecodeError:
+            return content.decode('latin-1', errors='ignore')
     
-    try:
-        doc_file = io.BytesIO(content)
-        doc = docx.Document(doc_file)
-        text = "\n".join([paragraph.text for paragraph in doc.paragraphs])
-        return text
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to parse Word document: {str(e)}")
-
-# DOC files (old Word format)
-elif filename.endswith('.doc'):
-    raise HTTPException(status_code=400, detail="Old Word format (.doc) not supported. Please convert to .docx or .txt")
-
-else:
-    raise HTTPException(status_code=400, detail="Unsupported file format. Please use TXT, PDF, or DOCX.")
-```
-
-@app.get("/", response_class=HTMLResponse)\
-async def home():\
-"""Serve the main page"""\
-return HTML_TEMPLATE
-
-@app.get("/api/departments")\
-async def get_departments():\
-"""Return list of all departments for dropdown"""\
-return {"departments": get_department_list()}
-
-@app.get("/api/roles")\
-async def get_roles():\
-"""Return list of all job roles for dropdown"""\
-return {"roles": get_role_list()}
-
-@app.get("/api/system")\
-async def get_system_info():\
-"""Return system information including whitelist count"""\
-return {\
-"total_whitelisted_urls": len(WHITELISTED_URLS),\
-"model": "claude-3-5-sonnet-20241022"\
-}
-
-@app.post("/api/session/create")\
-async def create_session():\
-"""Create a new session for tracking questions"""\
-session_id = str(uuid.uuid4())\
-sessions\[session_id\] = {\
-"created_at": datetime.now(),\
-"questions": \[\],\
-"documents": \[\],\
-"document_texts": \[\]  # Store full document content for queries\
-}\
-return {"session_id": session_id}
-
-@app.get("/api/session/{session_id}")\
-async def get_session(session_id: str):\
-"""Retrieve session data"""\
-if session_id not in sessions:\
-raise HTTPException(status_code=404, detail="Session not found")\
-return sessions\[session_id\]
-
-@app.get("/api/session/{session_id}/status")\
-async def get_session_status(session_id: str):\
-"""Get session status including document count"""\
-if session_id not in sessions:\
-return {\
-"exists": False,\
-"document_count": 0,\
-"can_query": False,\
-"documents": \[\]\
-}
-
-```
-doc_count = len(sessions[session_id].get("document_texts", []))
-return {
-    "exists": True,
-    "document_count": doc_count,
-    "can_query": doc_count > 0,
-    "documents": [doc["filename"] for doc in sessions[session_id].get("document_texts", [])]
-}
-```
-
-@app.post("/api/query")\
-async def query_ai(\
-question: str = Form(...),\
-department: str = Form("general_public_works"),\
-role: str = Form(""),\
-session_id: Optional\[str\] = Form(None),\
-api_key: Optional\[str\] = Form(None)\
-):\
-"""Query the AI with department-specific context and uploaded documents"""
-
-```
-# Check if session exists and has documents
-if not session_id or session_id not in sessions:
-    raise HTTPException(status_code=400, detail="Please upload documents first before asking questions.")
-
-if not sessions[session_id]["document_texts"]:
-    raise HTTPException(status_code=400, detail="Please upload at least one document before asking questions.")
-
-anthropic_client = Anthropic(api_key=api_key) if api_key else client
-
-# Get department and role prompts
-system_prompt = get_department_prompt(department, role)
-
-# Build context from uploaded documents
-document_context = "\n\n=== UPLOADED DOCUMENTS ===\n\n"
-for doc in sessions[session_id]["document_texts"]:
-    document_context += f"Document: {doc['filename']}\n{doc['content']}\n\n---\n\n"
-
-# Add instruction to reference documents
-enhanced_system_prompt = system_prompt + """
-```
-
-IMPORTANT: The user has uploaded documents to this session. You MUST:
-
-1. Answer questions based ONLY on the content of the uploaded documents provided below
-
-2. Cite specific documents and sections when providing answers using the format: (Source: \[filename\], Section: \[relevant section\])
-
-3. If the answer is not in the uploaded documents, clearly state: "This information is not available in the uploaded documents."
-
-4. Do not use external knowledge - only reference the document content provided
-
-5. When citing, be specific about which document and which part of the document contains the information\
-  """
-
-  try:\
-  response = anthropic_client.messages.create(\
-  model="claude-3-5-sonnet-20241022",\
-  max_tokens=4096,\
-  system=enhanced_system_prompt,\
-  messages=\[{\
-  "role": "user",\
-  "content": f"{document_context}\\n\\nQuestion: {question}"\
-  }\]\
-  )
-
-  ```
-   answer = response.content[0].text
-   
-   sessions[session_id]["questions"].append({
-       "question": question,
-       "answer": answer,
-       "department": get_department_name(department),
-       "role": role,
-       "timestamp": datetime.now().isoformat(),
-       "documents_referenced": len(sessions[session_id]["document_texts"])
-   })
-   
-   return {
-       "answer": answer,
-       "department": get_department_name(department),
-       "documents_used": len(sessions[session_id]["document_texts"])
-   }
-  ```
-
-  except Exception as e:\
-  raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/api/document/upload")\
-async def upload_document(\
-file: UploadFile = File(...),\
-session_id: str = Form(...),\
-department: str = Form("general_public_works"),\
-role: str = Form(""),\
-api_key: Optional\[str\] = Form(None)\
-):\
-"""Upload and analyze a document"""
-
-```
-if session_id not in sessions:
-    raise HTTPException(status_code=404, detail="Session not found")
-
-try:
-    # Read file content
-    content = await file.read()
+    # PDF files
+    elif filename.endswith('.pdf'):
+        if PdfReader is None:
+            raise HTTPException(status_code=400, detail="PDF support not available. Please install PyPDF2.")
+        
+        try:
+            pdf_file = io.BytesIO(content)
+            pdf_reader = PdfReader(pdf_file)
+            text = ""
+            for page in pdf_reader.pages:
+                text += page.extract_text() + "\n"
+            return text
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Failed to parse PDF: {str(e)}")
     
-    # Check file size (10MB limit)
-    if len(content) > 10 * 1024 * 1024:
-        raise HTTPException(status_code=400, detail="File too large. Maximum size is 10MB.")
+    # Word documents
+    elif filename.endswith('.docx'):
+        if docx is None:
+            raise HTTPException(status_code=400, detail="Word document support not available. Please install python-docx.")
+        
+        try:
+            doc_file = io.BytesIO(content)
+            doc = docx.Document(doc_file)
+            text = "\n".join([paragraph.text for paragraph in doc.paragraphs])
+            return text
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Failed to parse Word document: {str(e)}")
     
-    # Extract text based on file type
-    text_content = extract_text_from_file(content, file.filename)
+    # DOC files (old Word format)
+    elif filename.endswith('.doc'):
+        raise HTTPException(status_code=400, detail="Old Word format (.doc) not supported. Please convert to .docx or .txt")
     
-    # Limit content size for API (Claude has token limits)
-    max_chars = 100000  # ~100KB of text
-    if len(text_content) > max_chars:
-        text_content = text_content[:max_chars] + "\n\n[Content truncated due to size...]"
+    else:
+        raise HTTPException(status_code=400, detail="Unsupported file format. Please use TXT, PDF, or DOCX.")
+
+@app.get("/", response_class=HTMLResponse)
+async def home():
+    """Serve the main page"""
+    return HTML_TEMPLATE
+
+@app.get("/api/departments")
+async def get_departments():
+    """Return list of all departments for dropdown"""
+    return {"departments": get_department_list()}
+
+@app.get("/api/roles")
+async def get_roles():
+    """Return list of all job roles for dropdown"""
+    return {"roles": get_role_list()}
+
+@app.get("/api/system")
+async def get_system_info():
+    """Return system information including whitelist count"""
+    return {
+        "total_whitelisted_urls": len(WHITELISTED_URLS),
+        "model": "claude-3-5-sonnet-20241022"
+    }
+
+@app.post("/api/session/create")
+async def create_session():
+    """Create a new session for tracking questions"""
+    session_id = str(uuid.uuid4())
+    sessions[session_id] = {
+        "created_at": datetime.now(),
+        "questions": [],
+        "documents": [],
+        "document_texts": []  # Store full document content for queries
+    }
+    return {"session_id": session_id}
+
+@app.get("/api/session/{session_id}")
+async def get_session(session_id: str):
+    """Retrieve session data"""
+    if session_id not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return sessions[session_id]
+
+@app.get("/api/session/{session_id}/status")
+async def get_session_status(session_id: str):
+    """Get session status including document count"""
+    if session_id not in sessions:
+        return {
+            "exists": False,
+            "document_count": 0,
+            "can_query": False,
+            "documents": []
+        }
     
-    if not text_content.strip():
-        raise HTTPException(status_code=400, detail="No text content found in document.")
+    doc_count = len(sessions[session_id].get("document_texts", []))
+    return {
+        "exists": True,
+        "document_count": doc_count,
+        "can_query": doc_count > 0,
+        "documents": [doc["filename"] for doc in sessions[session_id].get("document_texts", [])]
+    }
+
+@app.post("/api/query")
+async def query_ai(
+    question: str = Form(...),
+    department: str = Form("general_public_works"),
+    role: str = Form(""),
+    session_id: Optional[str] = Form(None),
+    api_key: Optional[str] = Form(None)
+):
+    """Query the AI with department-specific context and uploaded documents"""
     
-    # Store the document text for later queries
-    sessions[session_id]["document_texts"].append({
-        "filename": file.filename,
-        "content": text_content
-    })
+    # Check if session exists and has documents
+    if not session_id or session_id not in sessions:
+        raise HTTPException(status_code=400, detail="Please upload documents first before asking questions.")
+    
+    if not sessions[session_id]["document_texts"]:
+        raise HTTPException(status_code=400, detail="Please upload at least one document before asking questions.")
     
     anthropic_client = Anthropic(api_key=api_key) if api_key else client
+    
+    # Get department and role prompts
     system_prompt = get_department_prompt(department, role)
     
-    response = anthropic_client.messages.create(
-        model="claude-3-5-sonnet-20241022",
-        max_tokens=4096,
-        system=system_prompt + "\n\nAnalyze this document and extract key institutional knowledge, procedures, and important information. Provide citations for any specific claims.",
-        messages=[{
-            "role": "user",
-            "content": f"Document: {file.filename}\n\nContent:\n{text_content}"
-        }]
-    )
+    # Build context from uploaded documents
+    document_context = "\n\n=== UPLOADED DOCUMENTS ===\n\n"
+    for doc in sessions[session_id]["document_texts"]:
+        document_context += f"Document: {doc['filename']}\n{doc['content']}\n\n---\n\n"
     
-    analysis = response.content[0].text
+    # Add instruction to reference documents
+    enhanced_system_prompt = system_prompt + """
+
+IMPORTANT: The user has uploaded documents to this session. You MUST:
+1. Answer questions based ONLY on the content of the uploaded documents provided below
+2. Cite specific documents and sections when providing answers using the format: (Source: [filename], Section: [relevant section])
+3. If the answer is not in the uploaded documents, clearly state: "This information is not available in the uploaded documents."
+4. Do not use external knowledge - only reference the document content provided
+5. When citing, be specific about which document and which part of the document contains the information
+"""
     
-    sessions[session_id]["documents"].append({
-        "filename": file.filename,
-        "analysis": analysis,
-        "department": get_department_name(department),
-        "role": role,
-        "uploaded_at": datetime.now().isoformat()
-    })
+    try:
+        response = anthropic_client.messages.create(
+            model="claude-3-5-sonnet-20241022",
+            max_tokens=4096,
+            system=enhanced_system_prompt,
+            messages=[{
+                "role": "user",
+                "content": f"{document_context}\n\nQuestion: {question}"
+            }]
+        )
+        
+        answer = response.content[0].text
+        
+        sessions[session_id]["questions"].append({
+            "question": question,
+            "answer": answer,
+            "department": get_department_name(department),
+            "role": role,
+            "timestamp": datetime.now().isoformat(),
+            "documents_referenced": len(sessions[session_id]["document_texts"])
+        })
+        
+        return {
+            "answer": answer,
+            "department": get_department_name(department),
+            "documents_used": len(sessions[session_id]["document_texts"])
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/document/upload")
+async def upload_document(
+    file: UploadFile = File(...),
+    session_id: str = Form(...),
+    department: str = Form("general_public_works"),
+    role: str = Form(""),
+    api_key: Optional[str] = Form(None)
+):
+    """Upload and analyze a document"""
     
-    return {
-        "filename": file.filename,
-        "analysis": analysis,
-        "department": get_department_name(department),
-        "total_documents": len(sessions[session_id]["document_texts"])
-    }
+    if session_id not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
     
-except HTTPException:
-    raise
-except Exception as e:
-    raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
-```
+    try:
+        # Read file content
+        content = await file.read()
+        
+        # Check file size (10MB limit)
+        if len(content) > 10 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="File too large. Maximum size is 10MB.")
+        
+        # Extract text based on file type
+        text_content = extract_text_from_file(content, file.filename)
+        
+        # Limit content size for API (Claude has token limits)
+        max_chars = 100000  # ~100KB of text
+        if len(text_content) > max_chars:
+            text_content = text_content[:max_chars] + "\n\n[Content truncated due to size...]"
+        
+        if not text_content.strip():
+            raise HTTPException(status_code=400, detail="No text content found in document.")
+        
+        # Store the document text for later queries
+        sessions[session_id]["document_texts"].append({
+            "filename": file.filename,
+            "content": text_content
+        })
+        
+        anthropic_client = Anthropic(api_key=api_key) if api_key else client
+        system_prompt = get_department_prompt(department, role)
+        
+        response = anthropic_client.messages.create(
+            model="claude-3-5-sonnet-20241022",
+            max_tokens=4096,
+            system=system_prompt + "\n\nAnalyze this document and extract key institutional knowledge, procedures, and important information. Provide citations for any specific claims.",
+            messages=[{
+                "role": "user",
+                "content": f"Document: {file.filename}\n\nContent:\n{text_content}"
+            }]
+        )
+        
+        analysis = response.content[0].text
+        
+        sessions[session_id]["documents"].append({
+            "filename": file.filename,
+            "analysis": analysis,
+            "department": get_department_name(department),
+            "role": role,
+            "uploaded_at": datetime.now().isoformat()
+        })
+        
+        return {
+            "filename": file.filename,
+            "analysis": analysis,
+            "department": get_department_name(department),
+            "total_documents": len(sessions[session_id]["document_texts"])
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
-@app.post("/api/report/generate")\
-async def generate_report(session_id: str = Form(...)):\
-"""Generate HTML report with all questions and documents"""
-
-```
-if session_id not in sessions:
-    raise HTTPException(status_code=404, detail="Session not found")
-
-session_data = sessions[session_id]
-
-html_report = f"""
+@app.post("/api/report/generate")
+async def generate_report(session_id: str = Form(...)):
+    """Generate HTML report with all questions and documents"""
+    
+    if session_id not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    session_data = sessions[session_id]
+    
+    html_report = f"""
 <!DOCTYPE html>
 <html>
 <head>
@@ -1211,9 +1183,9 @@ html_report = f"""
     
     <h2>Documents Analyzed ({len(session_data['documents'])})</h2>
 """
-
-for doc in session_data['documents']:
-    html_report += f"""
+    
+    for doc in session_data['documents']:
+        html_report += f"""
     <div class="document">
         <strong>Document:</strong> {doc['filename']} ({doc['department']})<br>
         {f"<strong>Role:</strong> {doc['role']}<br>" if doc.get('role') else ""}
@@ -1224,13 +1196,13 @@ for doc in session_data['documents']:
         <p class="metadata">Uploaded: {doc['uploaded_at']}</p>
     </div>
     """
-
-html_report += f"""
+    
+    html_report += f"""
     <h2>Questions & Answers ({len(session_data['questions'])})</h2>
 """
-
-for i, qa in enumerate(session_data['questions'], 1):
-    html_report += f"""
+    
+    for i, qa in enumerate(session_data['questions'], 1):
+        html_report += f"""
     <div class="question">
         <strong>Q{i} ({qa['department']}):</strong> {qa['question']}<br>
         {f"<strong>Role:</strong> {qa['role']}<br>" if qa.get('role') else ""}
@@ -1242,19 +1214,18 @@ for i, qa in enumerate(session_data['questions'], 1):
         <p class="metadata">Asked: {qa['timestamp']}</p>
     </div>
     """
-
-html_report += """
+    
+    html_report += """
 </body>
 </html>
 """
+    
+    return HTMLResponse(content=html_report)
 
-return HTMLResponse(content=html_report)
-```
-
-@app.delete("/api/session/{session_id}")\
-async def delete_session(session_id: str):\
-"""Delete a session"""\
-if session_id in sessions:\
-del sessions\[session_id\]\
-return {"message": "Session deleted"}\
-raise HTTPException(status_code=404, detail="Session not found")
+@app.delete("/api/session/{session_id}")
+async def delete_session(session_id: str):
+    """Delete a session"""
+    if session_id in sessions:
+        del sessions[session_id]
+        return {"message": "Session deleted"}
+    raise HTTPException(status_code=404, detail="Session not found")
