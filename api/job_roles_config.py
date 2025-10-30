@@ -1,235 +1,113 @@
 """
-Job Role Definitions for Municipal DPW Personnel
-Used to tailor AI responses to specific user roles and experience levels
+Job Roles Configuration for PipeWrench AI
+Defines role-specific contexts for municipal DPW positions
 """
 
 JOB_ROLES = {
-    "operator_trainee": {
-        "title": "Operator Trainee / New Hire",
-        "experience_level": "entry",
-        "focus_areas": [
-            "Basic safety procedures",
-            "Fundamental operational concepts",
-            "Standard operating procedures (SOPs)",
-            "Equipment familiarization",
-            "Regulatory basics",
-            "Mentorship and training resources"
-        ]
-    },
-    
-    "operator_1": {
-        "title": "Operator I / Technician I",
-        "experience_level": "junior",
-        "focus_areas": [
-            "Routine operations and maintenance",
-            "Basic troubleshooting",
-            "Safety compliance",
-            "Documentation and record-keeping",
-            "Equipment operation",
-            "Standard procedures"
-        ]
-    },
-    
-    "operator_2": {
-        "title": "Operator II / Technician II",
-        "experience_level": "intermediate",
-        "focus_areas": [
-            "Advanced operations",
-            "Process optimization",
-            "Intermediate troubleshooting",
-            "Preventive maintenance",
-            "Training junior staff",
-            "Regulatory compliance"
-        ]
-    },
-    
-    "operator_3": {
-        "title": "Operator III / Senior Technician",
-        "experience_level": "senior",
-        "focus_areas": [
-            "Complex troubleshooting",
-            "Process control and optimization",
-            "Emergency response",
-            "Mentoring and training",
-            "Regulatory reporting",
-            "System improvements"
-        ]
-    },
-    
-    "lead_operator": {
-        "title": "Lead Operator / Crew Leader",
-        "experience_level": "lead",
-        "focus_areas": [
-            "Crew supervision",
-            "Work planning and scheduling",
-            "Quality control",
-            "Safety oversight",
-            "Performance management",
-            "Resource allocation"
-        ]
-    },
-    
-    "supervisor": {
-        "title": "Supervisor / Foreman",
-        "experience_level": "supervisory",
-        "focus_areas": [
-            "Team management",
-            "Budget oversight",
-            "Project coordination",
-            "Performance evaluation",
-            "Policy implementation",
-            "Interdepartmental coordination"
-        ]
-    },
-    
-    "manager": {
-        "title": "Manager / Superintendent",
-        "experience_level": "management",
-        "focus_areas": [
-            "Strategic planning",
-            "Budget development",
-            "Policy development",
-            "Regulatory compliance oversight",
-            "Stakeholder communication",
-            "Long-term asset management"
-        ]
-    },
-    
     "director": {
-        "title": "Director / Department Head",
-        "experience_level": "executive",
-        "focus_areas": [
-            "Strategic vision",
-            "Political liaison",
-            "Budget and finance",
-            "Policy and governance",
-            "Public relations",
-            "Organizational development"
-        ]
+        "title": "Director/Superintendent",
+        "context": """You are assisting a Director or Superintendent of Public Works who oversees:
+- Strategic planning and budget management
+- Policy development and regulatory compliance
+- Interdepartmental coordination
+- Public relations and community engagement
+- Long-term infrastructure planning
+Focus on high-level strategic guidance, compliance requirements, and best practices for municipal leadership."""
     },
     
     "engineer": {
-        "title": "Engineer",
-        "experience_level": "professional",
-        "focus_areas": [
-            "Design and specifications",
-            "Technical analysis",
-            "Regulatory compliance",
-            "Project management",
-            "Quality assurance",
-            "Innovation and improvement"
-        ]
+        "title": "Civil/Public Works Engineer",
+        "context": """You are assisting a Civil or Public Works Engineer who handles:
+- Design and specifications for infrastructure projects
+- Technical review and plan approval
+- Construction oversight and quality control
+- Engineering standards and code compliance
+- Project cost estimation and feasibility studies
+Provide technical engineering guidance with proper citations to relevant codes and standards."""
+    },
+    
+    "foreman": {
+        "title": "Field Supervisor/Foreman",
+        "context": """You are assisting a Field Supervisor or Foreman who manages:
+- Daily crew operations and work assignments
+- Equipment deployment and maintenance scheduling
+- Safety compliance and incident reporting
+- Quality control of field work
+- Coordination with other departments
+Focus on practical field operations, safety procedures, and crew management best practices."""
+    },
+    
+    "maintenance_worker": {
+        "title": "Maintenance Worker/Technician",
+        "context": """You are assisting a Maintenance Worker or Technician who performs:
+- Routine maintenance and repairs
+- Equipment operation
+- Safety protocol compliance
+- Work order completion
+- Basic troubleshooting
+Provide clear, practical guidance on procedures, safety requirements, and proper techniques."""
+    },
+    
+    "water_operator": {
+        "title": "Water/Wastewater Operator",
+        "context": """You are assisting a Water or Wastewater Treatment Operator who handles:
+- Treatment plant operations
+- Water quality monitoring and testing
+- Regulatory compliance and reporting
+- Equipment maintenance and troubleshooting
+- Emergency response procedures
+Focus on operational procedures, regulatory requirements, and technical specifications for water/wastewater systems."""
+    },
+    
+    "fleet_manager": {
+        "title": "Fleet/Equipment Manager",
+        "context": """You are assisting a Fleet or Equipment Manager responsible for:
+- Vehicle and equipment maintenance programs
+- Fleet replacement planning
+- Procurement and specifications
+- Maintenance records and cost tracking
+- Vendor management
+Provide guidance on fleet management best practices, maintenance standards, and procurement procedures."""
     },
     
     "safety_officer": {
-        "title": "Safety Officer / Compliance Coordinator",
-        "experience_level": "professional",
-        "focus_areas": [
-            "Safety program development",
-            "Incident investigation",
-            "Training coordination",
-            "Regulatory compliance",
-            "Risk assessment",
-            "Emergency preparedness"
-        ]
+        "title": "Safety Officer/Coordinator",
+        "context": """You are assisting a Safety Officer or Coordinator who oversees:
+- Safety program development and implementation
+- OSHA compliance and training
+- Incident investigation and reporting
+- Safety equipment and PPE management
+- Risk assessment and mitigation
+Focus on safety regulations, compliance requirements, and best practices for workplace safety."""
     },
     
-    "maintenance_tech": {
-        "title": "Maintenance Technician",
-        "experience_level": "intermediate",
-        "focus_areas": [
-            "Equipment repair",
-            "Preventive maintenance",
-            "Troubleshooting",
-            "Parts management",
-            "Documentation",
-            "Safety procedures"
-        ]
-    },
-    
-    "electrician": {
-        "title": "Electrician / Instrumentation Tech",
-        "experience_level": "professional",
-        "focus_areas": [
-            "Electrical systems",
-            "Motor controls",
-            "SCADA and instrumentation",
-            "PLC programming",
-            "Troubleshooting",
-            "NEC compliance"
-        ]
-    },
-    
-    "mechanic": {
-        "title": "Mechanic / Fleet Technician",
-        "experience_level": "professional",
-        "focus_areas": [
-            "Vehicle and equipment repair",
-            "Diagnostics",
-            "Preventive maintenance",
-            "Hydraulic systems",
-            "Diesel engines",
-            "Welding and fabrication"
-        ]
-    },
-    
-    "lab_tech": {
-        "title": "Laboratory Technician",
-        "experience_level": "professional",
-        "focus_areas": [
-            "Sample collection and analysis",
-            "QA/QC procedures",
-            "Laboratory equipment",
-            "Data management",
-            "Regulatory reporting",
-            "Safety protocols"
-        ]
-    },
-    
-    "admin_staff": {
+    "admin": {
         "title": "Administrative Staff",
-        "experience_level": "support",
-        "focus_areas": [
-            "Customer service",
-            "Billing and accounts",
-            "Record management",
-            "Communication",
-            "Scheduling",
-            "Regulatory reporting support"
-        ]
+        "context": """You are assisting Administrative Staff who handle:
+- Records management and documentation
+- Public inquiries and customer service
+- Permit processing and tracking
+- Budget tracking and reporting
+- Interdepartmental communication
+Provide guidance on administrative procedures, record-keeping requirements, and customer service best practices."""
     }
 }
 
-def get_all_roles() -> list:
-    """
-    Get list of all role keys
-    
-    Returns:
-        List of role key strings
-    """
-    return list(JOB_ROLES.keys())
+def get_role_list():
+    """Return list of all roles for dropdown selection"""
+    return [
+        {"value": key, "title": role["title"]}
+        for key, role in JOB_ROLES.items()
+    ]
 
-def get_role_info(role_key: str) -> dict:
-    """
-    Get complete information for a specific role
-    
-    Args:
-        role_key: Key from JOB_ROLES
-        
-    Returns:
-        Role dictionary or empty dict if not found
-    """
-    return JOB_ROLES.get(role_key, {})
+def get_role_context(role_key: str) -> str:
+    """Get the context prompt for a specific role"""
+    if not role_key or role_key not in JOB_ROLES:
+        return ""
+    return JOB_ROLES[role_key]["context"]
 
-def get_role_focus_areas(role_key: str) -> list:
-    """
-    Get focus areas for a specific role
-    
-    Args:
-        role_key: Key from JOB_ROLES
-        
-    Returns:
-        List of focus area strings
-    """
-    role = JOB_ROLES.get(role_key, {})
-    return role.get("focus_areas", [])
+def get_role_title(role_key: str) -> str:
+    """Get the display title for a specific role"""
+    if not role_key or role_key not in JOB_ROLES:
+        return "General"
+    return JOB_ROLES[role_key]["title"]
