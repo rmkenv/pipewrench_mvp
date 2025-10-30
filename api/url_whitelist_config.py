@@ -1,13 +1,20 @@
-"""
+import os
+
+# Generate updated url_whitelist_config.py with custom URL support
+
+code = '''"""
 URL Whitelist Configuration for PipeWrench AI
 Contains all approved reference sources for municipal DPW compliance
+Plus support for custom organization URLs
 """
 
 from urllib.parse import urlparse
 from typing import List, Dict
+import json
+import os
 
-# Whitelisted URLs with child page inclusion
-WHITELISTED_URLS = [
+# Base whitelisted URLs (federal and state sources)
+BASE_WHITELISTED_URLS = [
     {"url": "https://www.acquisition.gov/far/part-36", "include_children": True},
     {"url": "https://highways.dot.gov/federal-lands/specs", "include_children": True},
     {"url": "https://www.osha.gov/laws-regs/regulations/standardnumber/1926", "include_children": True},
@@ -136,6 +143,121 @@ WHITELISTED_URLS = [
     {"url": "https://engineer-lsla.wyoming.gov/", "include_children": True},
 ]
 
+# Path to custom URLs file
+CUSTOM_URLS_FILE = os.path.join(os.path.dirname(__file__), "custom_whitelist.json")
+
+def load_custom_urls() -> List[Dict[str, any]]:
+    """Load custom URLs from JSON file"""
+    try:
+        if os.path.exists(CUSTOM_URLS_FILE):
+            with open(CUSTOM_URLS_FILE, 'r') as f:
+                return json.load(f)
+    except Exception as e:
+        print(f"Error loading custom URLs: {e}")
+    return []
+
+def save_custom_urls(custom_urls: List[Dict[str, any]]) -> bool:
+    """Save custom URLs to JSON file"""
+    try:
+        with open(CUSTOM_URLS_FILE, 'w') as f:
+            json.dump(custom_urls, f, indent=2)
+        return True
+    except Exception as e:
+        print(f"Error saving custom URLs: {e}")
+        return False
+
+def get_all_whitelisted_urls() -> List[Dict[str, any]]:
+    """Get combined list of base + custom URLs"""
+    custom_urls = load_custom_urls()
+    return BASE_WHITELISTED_URLS + custom_urls
+
+# Dynamic WHITELISTED_URLS that includes custom URLs
+WHITELISTED_URLS = get_all_whitelisted_urls()
+
+def add_custom_url(url: str, include_children: bool = True, description: str = "") -> Dict[str, any]:
+    """
+    Add a custom URL to the whitelist
+    
+    Args:
+        url: The URL to add
+        include_children: Whether to include child pages
+        description: Optional description of the source
+        
+    Returns:
+        Dictionary with success status and message
+    """
+    # Validate URL format
+    try:
+        parsed = urlparse(url)
+        if not parsed.scheme or not parsed.netloc:
+            return {"success": False, "message": "Invalid URL format"}
+    except Exception as e:
+        return {"success": False, "message": f"Invalid URL: {str(e)}"}
+    
+    # Load existing custom URLs
+    custom_urls = load_custom_urls()
+    
+    # Check if URL already exists
+    for entry in custom_urls:
+        if entry["url"] == url:
+            return {"success": False, "message": "URL already in custom whitelist"}
+    
+    # Check if URL is in base whitelist
+    for entry in BASE_WHITELISTED_URLS:
+        if entry["url"] == url:
+            return {"success": False, "message": "URL already in base whitelist"}
+    
+    # Add new URL
+    new_entry = {
+        "url": url,
+        "include_children": include_children,
+        "description": description,
+        "added_date": None  # Will be set by backend
+    }
+    
+    custom_urls.append(new_entry)
+    
+    # Save to file
+    if save_custom_urls(custom_urls):
+        # Refresh the global WHITELISTED_URLS
+        global WHITELISTED_URLS
+        WHITELISTED_URLS = get_all_whitelisted_urls()
+        return {"success": True, "message": "URL added successfully"}
+    else:
+        return {"success": False, "message": "Failed to save custom URL"}
+
+def remove_custom_url(url: str) -> Dict[str, any]:
+    """
+    Remove a custom URL from the whitelist
+    
+    Args:
+        url: The URL to remove
+        
+    Returns:
+        Dictionary with success status and message
+    """
+    custom_urls = load_custom_urls()
+    
+    # Find and remove the URL
+    original_length = len(custom_urls)
+    custom_urls = [entry for entry in custom_urls if entry["url"] != url]
+    
+    if len(custom_urls) == original_length:
+        return {"success": False, "message": "URL not found in custom whitelist"}
+    
+    # Save updated list
+    if save_custom_urls(custom_urls):
+        # Refresh the global WHITELISTED_URLS
+        global WHITELISTED_URLS
+        WHITELISTED_URLS = get_all_whitelisted_urls()
+        return {"success": True, "message": "URL removed successfully"}
+    else:
+        return {"success": False, "message": "Failed to save changes"}
+
+def get_custom_urls() -> List[Dict[str, any]]:
+    """Get list of custom URLs only"""
+    return load_custom_urls()
+
 def is_url_whitelisted(url: str) -> bool:
     """
     Check if a URL is whitelisted
@@ -149,10 +271,13 @@ def is_url_whitelisted(url: str) -> bool:
     if not url:
         return False
     
+    # Refresh whitelist to include any new custom URLs
+    all_urls = get_all_whitelisted_urls()
+    
     parsed_url = urlparse(url)
     url_domain_path = f"{parsed_url.netloc}{parsed_url.path}".rstrip('/')
     
-    for whitelist_entry in WHITELISTED_URLS:
+    for whitelist_entry in all_urls:
         whitelist_url = whitelist_entry["url"]
         parsed_whitelist = urlparse(whitelist_url)
         whitelist_domain_path = f"{parsed_whitelist.netloc}{parsed_whitelist.path}".rstrip('/')
@@ -170,12 +295,12 @@ def is_url_whitelisted(url: str) -> bool:
 
 def get_whitelisted_sources() -> List[Dict[str, str]]:
     """
-    Get list of all whitelisted sources
+    Get list of all whitelisted sources (base + custom)
     
     Returns:
         List of dictionaries containing URL and metadata
     """
-    return WHITELISTED_URLS.copy()
+    return get_all_whitelisted_urls()
 
 def get_whitelisted_domains() -> List[str]:
     """
@@ -184,8 +309,9 @@ def get_whitelisted_domains() -> List[str]:
     Returns:
         List of domain names
     """
+    all_urls = get_all_whitelisted_urls()
     domains = set()
-    for entry in WHITELISTED_URLS:
+    for entry in all_urls:
         parsed = urlparse(entry["url"])
         domains.add(parsed.netloc)
     return sorted(list(domains))
@@ -207,3 +333,18 @@ def validate_citation(citation_url: str) -> Dict[str, any]:
         "is_valid": is_valid,
         "message": "Valid source" if is_valid else "URL not in approved whitelist"
     }
+'''
+
+# Save the file
+os.makedirs('outputs', exist_ok=True)
+with open('outputs/url_whitelist_config.py', 'w') as f:
+    f.write(code)
+
+print("✅ Updated url_whitelist_config.py generated!")
+print("✅ Now includes custom URL management functions")
+print("\n📋 New features:")
+print("  - add_custom_url(url, include_children, description)")
+print("  - remove_custom_url(url)")
+print("  - get_custom_urls()")
+print("  - Custom URLs stored in custom_whitelist.json")
+print("\n📄 File ready for download!")
