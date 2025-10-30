@@ -1,12 +1,3 @@
-import os
-
-# Generate complete updated main.py with custom URL whitelist feature
-
-code = '''"""
-PipeWrench AI - Municipal DPW Knowledge Capture System
-FastAPI backend with document upload, AI query, and custom URL whitelisting
-"""
-
 from fastapi import FastAPI, Request, UploadFile, File
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -1039,18 +1030,3 @@ async def health_check():
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
-'''
-
-# Save the file
-os.makedirs('outputs', exist_ok=True)
-with open('outputs/main.py', 'w') as f:
-    f.write(code)
-
-print("✅ Complete main.py generated with custom URL whitelist feature!")
-print("\n📋 New features added:")
-print("  ✓ Custom URL management UI")
-print("  ✓ Add/remove custom URLs")
-print("  ✓ View custom URLs with descriptions")
-print("  ✓ Include/exclude child pages option")
-print("  ✓ Three new API endpoints")
-print("\n📄 File ready for download!")
