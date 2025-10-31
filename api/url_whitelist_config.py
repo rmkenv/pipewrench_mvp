@@ -1,8 +1,4 @@
-import os
-
-# Generate updated url_whitelist_config.py with custom URL support
-
-code = '''"""
+"""
 URL Whitelist Configuration for PipeWrench AI
 Contains all approved reference sources for municipal DPW compliance
 Plus support for custom organization URLs
@@ -333,17 +329,3 @@ def validate_citation(citation_url: str) -> Dict[str, any]:
         "is_valid": is_valid,
         "message": "Valid source" if is_valid else "URL not in approved whitelist"
     }
-'''
-
-# Save the file in current directory (no outputs folder)
-with open('url_whitelist_config.py', 'w') as f:
-    f.write(code)
-
-print("✅ Updated url_whitelist_config.py generated!")
-print("✅ Now includes custom URL management functions")
-print("\n📋 New features:")
-print("  - add_custom_url(url, include_children, description)")
-print("  - remove_custom_url(url)")
-print("  - get_custom_urls()")
-print("  - Custom URLs stored in custom_whitelist.json")
-print("\n📄 File ready for use!")
