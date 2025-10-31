@@ -335,9 +335,8 @@ def validate_citation(citation_url: str) -> Dict[str, any]:
     }
 '''
 
-# Save the file
-os.makedirs('outputs', exist_ok=True)
-with open('outputs/url_whitelist_config.py', 'w') as f:
+# Save the file in current directory (no outputs folder)
+with open('url_whitelist_config.py', 'w') as f:
     f.write(code)
 
 print("✅ Updated url_whitelist_config.py generated!")
@@ -347,4 +346,4 @@ print("  - add_custom_url(url, include_children, description)")
 print("  - remove_custom_url(url)")
 print("  - get_custom_urls()")
 print("  - Custom URLs stored in custom_whitelist.json")
-print("\n📄 File ready for download!")
+print("\n📄 File ready for use!")
