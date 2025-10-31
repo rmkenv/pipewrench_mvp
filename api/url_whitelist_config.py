@@ -304,6 +304,8 @@ def get_total_whitelisted_urls() -> int:
     
     Returns:
         Integer count of whitelisted URLs
+    
+    Note: This function is imported by main.py for display purposes
     """
     return len(get_all_whitelisted_urls())
 
