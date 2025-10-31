@@ -298,19 +298,29 @@ def get_whitelisted_sources() -> List[Dict[str, str]]:
     """
     return get_all_whitelisted_urls()
 
-def get_whitelisted_domains() -> List[str]:
+def get_total_whitelisted_urls() -> int:
     """
-    Get list of unique whitelisted domains
+    Get total count of whitelisted URLs (base + custom)
     
     Returns:
-        List of domain names
+        Integer count of whitelisted URLs
+    """
+    return len(get_all_whitelisted_urls())
+
+
+def get_whitelisted_domains() -> set:
+    """
+    Get set of unique whitelisted domains
+    
+    Returns:
+        Set of domain names
     """
     all_urls = get_all_whitelisted_urls()
     domains = set()
     for entry in all_urls:
         parsed = urlparse(entry["url"])
         domains.add(parsed.netloc)
-    return sorted(list(domains))
+    return domains
 
 def validate_citation(citation_url: str) -> Dict[str, any]:
     """
