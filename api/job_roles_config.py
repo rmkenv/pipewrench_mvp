@@ -1,6 +1,7 @@
 """
 Job Roles Configuration for PipeWrench AI
 Defines role-specific contexts for municipal DPW positions
+Version: 2024-10-31-v2 - Reorganized function order for Vercel serverless compatibility
 """
 
 JOB_ROLES = {
@@ -93,26 +94,7 @@ Provide guidance on administrative procedures, record-keeping requirements, and 
     }
 }
 
-def get_role_list():
-    """Return list of all roles for dropdown selection"""
-    return [
-        {"value": key, "title": role["title"]}
-        for key, role in JOB_ROLES.items()
-    ]
-
-def get_role_context(role_key: str) -> str:
-    """Get the context prompt for a specific role"""
-    if not role_key or role_key not in JOB_ROLES:
-        return ""
-    return JOB_ROLES[role_key]["context"]
-
-def get_role_title(role_key: str) -> str:
-    """Get the display title for a specific role"""
-    if not role_key or role_key not in JOB_ROLES:
-        return "General"
-    return JOB_ROLES[role_key]["title"]
-
-
+# Primary functions - defined early for Vercel serverless import compatibility
 def get_all_roles():
     """Get list of all role keys"""
     return list(JOB_ROLES.keys())
@@ -133,6 +115,29 @@ def get_role_info(role_key: str):
             if line.strip().startswith("-")
         ]
     }
+
+
+# Helper functions
+def get_role_list():
+    """Return list of all roles for dropdown selection"""
+    return [
+        {"value": key, "title": role["title"]}
+        for key, role in JOB_ROLES.items()
+    ]
+
+
+def get_role_context(role_key: str) -> str:
+    """Get the context prompt for a specific role"""
+    if not role_key or role_key not in JOB_ROLES:
+        return ""
+    return JOB_ROLES[role_key]["context"]
+
+
+def get_role_title(role_key: str) -> str:
+    """Get the display title for a specific role"""
+    if not role_key or role_key not in JOB_ROLES:
+        return "General"
+    return JOB_ROLES[role_key]["title"]
 
 
 def get_role_focus_areas(role_key: str):
