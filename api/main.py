@@ -12,8 +12,21 @@ import PyPDF2
 import io
 import re
 from urllib.parse import urlparse
+import requests
+import dotenv
+import os
+import anthropic
+
+dotenv.load_dotenv()
 
 app = FastAPI()
+
+# ============================================================================
+# CONFIGURATION: ENVIRONMENT VARIABLES AND CLIENTS
+# ============================================================================
+DRAWING_PROCESSING_API_URL = os.getenv("DRAWING_PROCESSING_API_URL", "http://localhost:8001/parse")
+
+anthropic_client = anthropic.Anthropic()
 
 # ============================================================================
 # CONFIGURATION: JOB ROLES
@@ -498,6 +511,7 @@ class UploadResponse(BaseModel):
     filename: str
     pages: int
     message: str
+    is_asbuilt: bool = False
 
 class CustomURLRequest(BaseModel):
     session_id: str
@@ -601,12 +615,53 @@ def generate_mock_response(query: str, context: str, system_prompt: str, has_doc
     
     return response
 
+def extract_text_from_asbuilt_pdf(file: UploadFile) -> str:
+    """Extract text from as-built drawing PDF (specialized processing)"""
+    file.file.seek(0)
+    response = requests.post(
+        DRAWING_PROCESSING_API_URL,
+        files={
+            "file": (file.filename, file.file, file.content_type)
+        },
+        data={
+            "ocr_method": "textract"
+        }
+    )
+
+    if response.status_code != 200:
+        raise HTTPException(status_code=400, detail="Error processing as-built PDF")
+    data = response.text
+    return data
+
+def generate_llm_response(query: str, context: str, system_prompt: str, has_document: bool) -> str:
+    try:
+        message = anthropic_client.messages.create(
+            model="claude-sonnet-4-5",
+            max_tokens=1024,
+            system=system_prompt,
+            messages=[
+                {"role": "assistant", "content": "Use user query and document context to generate response."},
+                {"role": "user", "content": f"User query: {query}\nDocument context: {context}"}
+            ]
+        )
+
+        if message.content and len(message.content) > 0:
+            # Get the first text block
+            return message.content[0].text
+        else:
+            raise HTTPException(status_code=500, detail="Empty response from LLM")
+            
+    except anthropic.APIError as e:
+        raise HTTPException(status_code=500, detail=f"Anthropic API Error: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating LLM response: {str(e)}")
+
 # ============================================================================
 # API ENDPOINTS
 # ============================================================================
 
 @app.post("/upload")
-async def upload_document(file: UploadFile = File(...)):
+async def upload_document(file: UploadFile = File(...), is_asbuilt: bool = False):
     """Upload and process PDF document"""
     
     if not file.filename.endswith('.pdf'):
@@ -616,7 +671,13 @@ async def upload_document(file: UploadFile = File(...)):
     content = await file.read()
     
     # Extract text
-    text = extract_text_from_pdf(content)
+    if is_asbuilt:
+        # Specialized processing for as-built drawings can be added here
+        file.file.seek(0)
+        text = extract_text_from_asbuilt_pdf(file)
+    else:
+        # Read file
+        text = extract_text_from_pdf(content)
     
     # Create session
     import uuid
@@ -626,7 +687,8 @@ async def upload_document(file: UploadFile = File(...)):
     sessions[session_id] = {
         "filename": file.filename,
         "text": text,
-        "uploaded_at": "timestamp_here"
+        "uploaded_at": "timestamp_here",
+        "is_asbuilt": is_asbuilt
     }
     
     # Count pages
@@ -637,7 +699,8 @@ async def upload_document(file: UploadFile = File(...)):
         session_id=session_id,
         filename=file.filename,
         pages=page_count,
-        message=f"Successfully uploaded {file.filename} ({page_count} pages)"
+        message=f"Successfully uploaded {file.filename} ({page_count} pages)",
+        is_asbuilt=is_asbuilt
     )
 
 @app.post("/query")
@@ -657,8 +720,12 @@ async def query_documents(request: QueryRequest):
     system_prompt = create_system_prompt(request.role, request.department)
     
     # Generate response (replace with actual LLM call)
-    response = generate_mock_response(request.query, document_text, system_prompt, has_document)
-    
+    if has_document:
+        # response = generate_llm_response(request.query, document_text, system_prompt, has_document)
+        response = generate_llm_response(request.query, document_text, system_prompt, has_document)
+    else:
+        response = generate_mock_response(request.query, document_text, system_prompt, has_document)
+
     sources = ["whitelisted_urls"]
     if has_document:
         sources.insert(0, "uploaded_document")
@@ -1063,6 +1130,17 @@ HTML_TEMPLATE = """
                 <div style="color: #999; font-size: 0.9em; margin-top: 10px;">PDF files only</div>
                 <input type="file" id="fileInput" accept=".pdf" onchange="handleFileSelect(event)">
             </div>
+
+            <!-- As-Built Checkbox -->
+            <div style="margin-top: 15px; padding: 15px; background: #f0f8ff; border-radius: 8px;">
+                <label style="display: flex; align-items: center; cursor: pointer; font-weight: 500; color: #333;">
+                    <input type="checkbox" id="asBuiltCheckbox" style="width: auto; margin-right: 10px; cursor: pointer;">
+                    <span>📐 This is an As-Built/Record Drawing</span>
+                </label>
+                <p style="margin: 8px 0 0 32px; color: #666; font-size: 0.9em;">
+                    Check this if uploading construction as-built drawings or record documents
+                </p>
+            </div>
         </div>
 
         <!-- Query Section -->
@@ -1218,10 +1296,15 @@ HTML_TEMPLATE = """
             const formData = new FormData();
             formData.append('file', file);
 
+            // Get checkbox value
+            const isAsBuilt = document.getElementById('asBuiltCheckbox').checked;
+
             showAlert('Uploading and processing document...', 'info');
 
             try {
-                const response = await fetch('/upload', {
+                // Send is_asbuilt as query parameter
+                const url = `/upload?is_asbuilt=${isAsBuilt}`;
+                const response = await fetch(url, {
                     method: 'POST',
                     body: formData
                 });
