@@ -2,7 +2,7 @@
 PipeWrench AI - Municipal DPW Knowledge Capture System
 FastAPI application with improved error handling, logging, and production readiness.
 """
-# Force redeploy timestamp: 2025-10-31 14:30:00 UTC
+# Force redeploy timestamp: 2025-10-31 13:15:00 UTC - URL whitelist fix
 
 from fastapi import FastAPI, Form, UploadFile, File, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse

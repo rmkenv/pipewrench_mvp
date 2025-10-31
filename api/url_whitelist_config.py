@@ -3,7 +3,7 @@ URL Whitelist Configuration for PipeWrench AI
 Contains all approved reference sources for municipal DPW compliance
 Plus support for custom organization URLs
 
-Version: 2.0.0 - Fixed Vercel deployment (2025-10-31)
+Version: 2.0.1 - Vercel cache-bust fix (2025-10-31 13:15 UTC)
 """
 
 from urllib.parse import urlparse
