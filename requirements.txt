@@ -6,3 +6,5 @@ PyPDF2
 python-docx
 jinja2
 pycryptodome
+python-dotenv
+requests

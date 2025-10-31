@@ -13,8 +13,20 @@ import io
 import re
 from urllib.parse import urlparse
 import requests
+import dotenv
+import os
+import anthropic
+
+dotenv.load_dotenv()
 
 app = FastAPI()
+
+# ============================================================================
+# CONFIGURATION: ENVIRONMENT VARIABLES AND CLIENTS
+# ============================================================================
+DRAWING_PROCESSING_API_URL = os.getenv("DRAWING_PROCESSING_API_URL", "http://localhost:8001/parse")
+
+anthropic_client = anthropic.Anthropic()
 
 # ============================================================================
 # CONFIGURATION: JOB ROLES
@@ -607,7 +619,7 @@ def extract_text_from_asbuilt_pdf(file: UploadFile) -> str:
     """Extract text from as-built drawing PDF (specialized processing)"""
     file.file.seek(0)
     response = requests.post(
-        "http://127.0.0.1:8080/parse",
+        DRAWING_PROCESSING_API_URL,
         files={
             "file": (file.filename, file.file, file.content_type)
         },
@@ -618,8 +630,32 @@ def extract_text_from_asbuilt_pdf(file: UploadFile) -> str:
 
     if response.status_code != 200:
         raise HTTPException(status_code=400, detail="Error processing as-built PDF")
-    data = response.json()
-    return data.get("text", "")
+    data = response.text
+    return data
+
+def generate_llm_response(query: str, context: str, system_prompt: str, has_document: bool) -> str:
+    try:
+        message = anthropic_client.messages.create(
+            model="claude-sonnet-4-5",
+            max_tokens=1024,
+            system=system_prompt,
+            messages=[
+                {"role": "assistant", "content": "Use user query and document context to generate response."},
+                {"role": "user", "content": f"User query: {query}\nDocument context: {context}"}
+            ]
+        )
+
+        if message.content and len(message.content) > 0:
+            # Get the first text block
+            return message.content[0].text
+        else:
+            raise HTTPException(status_code=500, detail="Empty response from LLM")
+            
+    except anthropic.APIError as e:
+        raise HTTPException(status_code=500, detail=f"Anthropic API Error: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating LLM response: {str(e)}")
+
 # ============================================================================
 # API ENDPOINTS
 # ============================================================================
@@ -684,8 +720,12 @@ async def query_documents(request: QueryRequest):
     system_prompt = create_system_prompt(request.role, request.department)
     
     # Generate response (replace with actual LLM call)
-    response = generate_mock_response(request.query, document_text, system_prompt, has_document)
-    
+    if has_document:
+        # response = generate_llm_response(request.query, document_text, system_prompt, has_document)
+        response = generate_llm_response(request.query, document_text, system_prompt, has_document)
+    else:
+        response = generate_mock_response(request.query, document_text, system_prompt, has_document)
+
     sources = ["whitelisted_urls"]
     if has_document:
         sources.insert(0, "uploaded_document")
