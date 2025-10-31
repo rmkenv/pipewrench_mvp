@@ -111,3 +111,33 @@ def get_role_title(role_key: str) -> str:
     if not role_key or role_key not in JOB_ROLES:
         return "General"
     return JOB_ROLES[role_key]["title"]
+
+
+def get_all_roles():
+    """Get list of all role keys"""
+    return list(JOB_ROLES.keys())
+
+
+def get_role_info(role_key: str):
+    """Get complete information for a specific role"""
+    if not role_key or role_key not in JOB_ROLES:
+        return None
+    
+    role = JOB_ROLES[role_key]
+    return {
+        "title": role["title"],
+        "context": role["context"],
+        "focus_areas": [
+            line.strip("- ").strip() 
+            for line in role["context"].split("\n") 
+            if line.strip().startswith("-")
+        ]
+    }
+
+
+def get_role_focus_areas(role_key: str):
+    """Get focus areas for a specific role"""
+    role_info = get_role_info(role_key)
+    if role_info:
+        return role_info.get("focus_areas", [])
+    return []
