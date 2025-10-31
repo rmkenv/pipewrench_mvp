@@ -2,6 +2,8 @@
 URL Whitelist Configuration for PipeWrench AI
 Contains all approved reference sources for municipal DPW compliance
 Plus support for custom organization URLs
+
+Version: 2.0.0 - Fixed Vercel deployment (2025-10-31)
 """
 
 from urllib.parse import urlparse
@@ -167,6 +169,17 @@ def get_all_whitelisted_urls() -> List[Dict[str, any]]:
     custom_urls = load_custom_urls()
     return BASE_WHITELISTED_URLS + custom_urls
 
+def get_total_whitelisted_urls() -> int:
+    """
+    Get total count of whitelisted URLs (base + custom)
+    
+    Returns:
+        Integer count of whitelisted URLs
+    
+    Note: This function is imported by main.py for display purposes
+    """
+    return len(get_all_whitelisted_urls())
+
 # Dynamic WHITELISTED_URLS that includes custom URLs
 WHITELISTED_URLS = get_all_whitelisted_urls()
 
@@ -297,18 +310,6 @@ def get_whitelisted_sources() -> List[Dict[str, str]]:
         List of dictionaries containing URL and metadata
     """
     return get_all_whitelisted_urls()
-
-def get_total_whitelisted_urls() -> int:
-    """
-    Get total count of whitelisted URLs (base + custom)
-    
-    Returns:
-        Integer count of whitelisted URLs
-    
-    Note: This function is imported by main.py for display purposes
-    """
-    return len(get_all_whitelisted_urls())
-
 
 def get_whitelisted_domains() -> set:
     """
