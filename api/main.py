@@ -41,21 +41,29 @@ app.add_middleware(
 # ============================================================================
 
 try:
+    # Try to import the actual functions
     from url_whitelist_config import (
         WHITELISTED_URLS,
         get_whitelisted_domains,
-        get_all_whitelisted_urls,  # CHANGED: This is the correct function name
+        get_all_whitelisted_urls,
         is_url_whitelisted,
         URL_REGEX
     )
     
-    # Create an alias for compatibility with existing code
-    get_total_whitelisted_urls = get_all_whitelisted_urls
+    # The function exists in your file, but let's be safe
+    try:
+        from url_whitelist_config import get_total_whitelisted_urls
+    except ImportError:
+        # If it's still not found, create an alias
+        get_total_whitelisted_urls = get_all_whitelisted_urls
     
-    logger.info("Successfully imported URL whitelist configuration")
+    logger.info("✅ Successfully imported URL whitelist configuration")
+    
 except ImportError as e:
-    logger.error(f"Failed to import url_whitelist_config: {e}")
-    # Fallback to minimal whitelist to keep the app running
+    logger.error(f"❌ Failed to import url_whitelist_config: {e}")
+    logger.info("🔄 Using fallback whitelist configuration")
+    
+    # Fallback implementation
     WHITELISTED_URLS = [
         {"url": "https://www.epa.gov", "description": "EPA Regulations"},
         {"url": "https://www.osha.gov", "description": "OSHA Standards"},
@@ -75,8 +83,8 @@ except ImportError as e:
     def get_all_whitelisted_urls():
         return len(WHITELISTED_URLS)
     
-    # Create alias for compatibility
-    get_total_whitelisted_urls = get_all_whitelisted_urls
+    def get_total_whitelisted_urls():
+        return len(WHITELISTED_URLS)
     
     def is_url_whitelisted(url: str) -> bool:
         try:
