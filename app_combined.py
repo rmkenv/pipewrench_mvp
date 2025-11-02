@@ -18,6 +18,7 @@ import re
 from urllib.parse import urlparse
 import requests
 import logging
+import json
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -45,7 +46,12 @@ templates = Jinja2Templates(directory="templates")
 # ====
 # URL WHITELIST CONFIGURATION
 # ====
-WHITELISTED_URLS = [
+
+WHITELIST_URL = "https://raw.githubusercontent.com/rmkenv/pipewrench_mvp/main/custom_whitelist.json"
+URL_REGEX = re.compile(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+')
+
+# Default embedded whitelist as fallback
+EMBEDDED_WHITELIST = [
     {"url": "https://www.epa.gov", "description": "EPA Regulations"},
     {"url": "https://www.osha.gov", "description": "OSHA Standards"},
     {"url": "https://www.fhwa.dot.gov", "description": "FHWA Standards"},
@@ -54,23 +60,39 @@ WHITELISTED_URLS = [
     {"url": "https://www.asce.org", "description": "ASCE Standards"},
 ]
 
-URL_REGEX = re.compile(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+')
+whitelist_urls = []  # Will hold list of URL strings loaded from JSON
+
+def fetch_whitelist():
+    global whitelist_urls
+    try:
+        logger.info(f"Fetching whitelist from {WHITELIST_URL} ...")
+        response = requests.get(WHITELIST_URL, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        # Expecting list of dicts with "url" keys
+        whitelist_urls = [entry["url"] for entry in data if "url" in entry]
+        logger.info(f"Loaded {len(whitelist_urls)} URLs from external whitelist")
+    except Exception as e:
+        logger.warning(f"Failed to fetch external whitelist: {e}")
+        # Fallback to embedded whitelist URLs
+        whitelist_urls = [entry["url"] for entry in EMBEDDED_WHITELIST]
+        logger.info(f"Using embedded whitelist with {len(whitelist_urls)} URLs")
 
 def get_whitelisted_domains():
     domains = set()
-    for entry in WHITELISTED_URLS:
-        parsed = urlparse(entry["url"])
+    for url in whitelist_urls:
+        parsed = urlparse(url)
         domains.add(parsed.netloc)
     return domains
 
 def get_total_whitelisted_urls():
-    return len(WHITELISTED_URLS)
+    return len(whitelist_urls)
 
 def is_url_whitelisted(url: str) -> bool:
     try:
         parsed = urlparse(url)
-        for whitelisted in WHITELISTED_URLS:
-            whitelisted_parsed = urlparse(whitelisted["url"])
+        for whitelisted_url in whitelist_urls:
+            whitelisted_parsed = urlparse(whitelisted_url)
             if (parsed.netloc == whitelisted_parsed.netloc and 
                 parsed.path.startswith(whitelisted_parsed.path)):
                 return True
@@ -717,6 +739,7 @@ async def startup_event():
     logger.info("=" * 70)
     logger.info("PipeWrench AI - Municipal DPW Knowledge Capture System")
     logger.info("=" * 70)
+    fetch_whitelist()
     logger.info(f"Whitelisted URLs: {get_total_whitelisted_urls()}")
     logger.info(f"Departments: {len(DEPARTMENT_PROMPTS)}")
     logger.info(f"Job Roles: {len(JOB_ROLES)}")
