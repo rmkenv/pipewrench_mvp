@@ -1,11 +1,9 @@
-import os
-
-# Generate updated url_whitelist_config.py with custom URL support
-
-code = '''"""
+"""
 URL Whitelist Configuration for PipeWrench AI
 Contains all approved reference sources for municipal DPW compliance
 Plus support for custom organization URLs
+
+Version: 2.0.1 - Vercel cache-bust fix (2025-10-31 13:15 UTC)
 """
 
 from urllib.parse import urlparse
@@ -171,6 +169,17 @@ def get_all_whitelisted_urls() -> List[Dict[str, any]]:
     custom_urls = load_custom_urls()
     return BASE_WHITELISTED_URLS + custom_urls
 
+def get_total_whitelisted_urls() -> int:
+    """
+    Get total count of whitelisted URLs (base + custom)
+    
+    Returns:
+        Integer count of whitelisted URLs
+    
+    Note: This function is imported by main.py for display purposes
+    """
+    return len(get_all_whitelisted_urls())
+
 # Dynamic WHITELISTED_URLS that includes custom URLs
 WHITELISTED_URLS = get_all_whitelisted_urls()
 
@@ -302,19 +311,19 @@ def get_whitelisted_sources() -> List[Dict[str, str]]:
     """
     return get_all_whitelisted_urls()
 
-def get_whitelisted_domains() -> List[str]:
+def get_whitelisted_domains() -> set:
     """
-    Get list of unique whitelisted domains
+    Get set of unique whitelisted domains
     
     Returns:
-        List of domain names
+        Set of domain names
     """
     all_urls = get_all_whitelisted_urls()
     domains = set()
     for entry in all_urls:
         parsed = urlparse(entry["url"])
         domains.add(parsed.netloc)
-    return sorted(list(domains))
+    return domains
 
 def validate_citation(citation_url: str) -> Dict[str, any]:
     """
@@ -333,18 +342,3 @@ def validate_citation(citation_url: str) -> Dict[str, any]:
         "is_valid": is_valid,
         "message": "Valid source" if is_valid else "URL not in approved whitelist"
     }
-'''
-
-# Save the file
-os.makedirs('outputs', exist_ok=True)
-with open('outputs/url_whitelist_config.py', 'w') as f:
-    f.write(code)
-
-print("✅ Updated url_whitelist_config.py generated!")
-print("✅ Now includes custom URL management functions")
-print("\n📋 New features:")
-print("  - add_custom_url(url, include_children, description)")
-print("  - remove_custom_url(url)")
-print("  - get_custom_urls()")
-print("  - Custom URLs stored in custom_whitelist.json")
-print("\n📄 File ready for download!")
