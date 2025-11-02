@@ -2,15 +2,15 @@ services:
   - type: web
     name: pipewrench-ai
     env: python
-    plan: free        # Change this if needed (e.g. 'starter' or 'standard')
+    plan: free
     region: oregon
-    buildCommand: ./.render-build.sh
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
     startCommand: uvicorn app_combined:app --host 0.0.0.0 --port $PORT
     autoDeploy: true
     healthCheckPath: /
     envVars:
       - key: ANTHROPIC_API_KEY
-        sync: false    # Set this manually in Render Dashboard
+        sync: false
       - key: DRAWING_PROCESSING_API_URL
         value: http://localhost:8001/parse
       - key: PYTHON_VERSION
