@@ -44,10 +44,14 @@ try:
     from url_whitelist_config import (
         WHITELISTED_URLS,
         get_whitelisted_domains,
-        get_total_whitelisted_urls,
+        get_all_whitelisted_urls,  # CHANGED: This is the correct function name
         is_url_whitelisted,
         URL_REGEX
     )
+    
+    # Create an alias for compatibility with existing code
+    get_total_whitelisted_urls = get_all_whitelisted_urls
+    
     logger.info("Successfully imported URL whitelist configuration")
 except ImportError as e:
     logger.error(f"Failed to import url_whitelist_config: {e}")
@@ -68,8 +72,11 @@ except ImportError as e:
             domains.add(parsed.netloc)
         return domains
     
-    def get_total_whitelisted_urls():
+    def get_all_whitelisted_urls():
         return len(WHITELISTED_URLS)
+    
+    # Create alias for compatibility
+    get_total_whitelisted_urls = get_all_whitelisted_urls
     
     def is_url_whitelisted(url: str) -> bool:
         try:
