@@ -140,6 +140,7 @@ BASE_WHITELISTED_URLS = [
     {"url": "https://dsps.wi.gov/Pages/Professions/Engineer/Default.aspx", "include_children": True},
     {"url": "https://www.dot.state.wy.us/home/engineering_technical_programs/engineering_programs.html", "include_children": True},
     {"url": "https://engineer-lsla.wyoming.gov/", "include_children": True},
+    {"url": "https://www.ringpower.com/media/oujnpuga/caterpillarperfhandbook_ed50.pdf", "include_children": False},
 ]
 
 # Path to custom URLs file
