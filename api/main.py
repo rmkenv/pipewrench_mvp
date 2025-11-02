@@ -13,134 +13,69 @@ from datetime import datetime
 from typing import Optional
 import io
 import re
-from pathlib import Path
+from urllib.parse import urlparse
+import requests
+import dotenv
+import os
+import anthropic
 
-# Import for file parsing
-try:
-    from PyPDF2 import PdfReader
-except ImportError:
-    PdfReader = None
+dotenv.load_dotenv()
 
-try:
-    import docx
-except ImportError:
-    docx = None
+app = FastAPI()
 
-# Add path for local imports
-import sys
-sys.path.insert(0, os.path.dirname(__file__))
+# ============================================================================
+# CONFIGURATION: ENVIRONMENT VARIABLES AND CLIENTS
+# ============================================================================
+DRAWING_PROCESSING_API_URL = os.getenv("DRAWING_PROCESSING_API_URL", "http://localhost:8001/parse")
 
-# Import configurations
-from department_prompts_config import (
-    get_department_prompt,
-    get_department_list,
-    get_department_name,
-)
-from url_whitelist_config import (
-    is_url_whitelisted,
-    get_whitelisted_domains,
-    get_total_whitelisted_urls,
-    WHITELISTED_URLS,
-)
-from job_roles_config import (
-    get_all_roles,
-    get_role_info,
-)
+anthropic_client = anthropic.Anthropic()
 
-# Import new modules
-from config import settings
-from utils import logger, SessionManager, sanitize_html, validate_file_extension, format_file_size
-from models import (
-    SessionCreateResponse, SessionStatusResponse, QueryResponse,
-    DocumentUploadResponse, HealthCheckResponse, SystemInfoResponse,
-    ErrorResponse
-)
+# ============================================================================
+# CONFIGURATION: JOB ROLES
+# ============================================================================
 
-# Validate configuration on startup
-try:
-    settings.validate()
-    logger.info("Configuration validated successfully")
-except ValueError as e:
-    logger.error(f"Configuration error: {e}")
-    # Don't crash on startup, but log the error
-    # This allows health checks to work even without API key
+JOB_ROLES = {
+    "general": {
+        "name": "General DPW Staff",
+        "context": "You are assisting general Department of Public Works staff with municipal infrastructure questions."
+    },
+    "director": {
+        "name": "DPW Director",
+        "context": "You are assisting a DPW Director with strategic planning, policy decisions, and departmental oversight."
+    },
+    "engineer": {
+        "name": "Civil Engineer",
+        "context": "You are assisting a licensed civil engineer with technical engineering standards, design specifications, and compliance requirements."
+    },
+    "project_manager": {
+        "name": "Project Manager",
+        "context": "You are assisting a project manager with construction management, scheduling, budgeting, and contractor coordination."
+    },
+    "inspector": {
+        "name": "Construction Inspector",
+        "context": "You are assisting a construction inspector with field inspection procedures, quality control, and compliance verification."
+    },
+    "maintenance": {
+        "name": "Maintenance Supervisor",
+        "context": "You are assisting a maintenance supervisor with asset management, preventive maintenance, and repair operations."
+    },
+    "environmental": {
+        "name": "Environmental Compliance Officer",
+        "context": "You are assisting an environmental compliance officer with EPA regulations, stormwater management, and environmental permits."
+    },
+    "safety": {
+        "name": "Safety Officer",
+        "context": "You are assisting a safety officer with OSHA compliance, workplace safety, and accident prevention."
+    }
+}
 
-# Initialize FastAPI app
-app = FastAPI(
-    title="PipeWrench AI",
-    description="Municipal DPW Knowledge Capture System",
-    version="1.1.0",
-    docs_url="/api/docs",
-    redoc_url="/api/redoc",
-)
+def get_role_list():
+    """Return list of available roles"""
+    return [{"id": role_id, "name": role_data["name"]} for role_id, role_data in JOB_ROLES.items()]
 
-# Configure CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # In production, restrict this to your domains
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# Initialize session manager
-session_manager = SessionManager()
-
-# Initialize Anthropic client
-try:
-    client = Anthropic(api_key=settings.ANTHROPIC_API_KEY) if settings.ANTHROPIC_API_KEY else None
-except Exception as e:
-    logger.error(f"Failed to initialize Anthropic client: {e}")
-    client = None
-
-# URL regex for citation enforcement
-URL_REGEX = re.compile(r'https?://[^\s)>\]]+')
-
-# Load HTML template
-HTML_TEMPLATE = None
-html_path = Path(__file__).parent.parent / "index.html"
-try:
-    if html_path.exists():
-        with open(html_path, "r", encoding="utf-8") as f:
-            HTML_TEMPLATE = f.read()
-        logger.info("HTML template loaded successfully")
-    else:
-        logger.warning(f"HTML template not found at {html_path}")
-except Exception as e:
-    logger.error(f"Failed to load HTML template: {e}")
-
-
-# Startup event
-@app.on_event("startup")
-async def startup_event():
-    """Application startup tasks."""
-    logger.info("=" * 50)
-    logger.info("PipeWrench AI Starting Up")
-    logger.info("=" * 50)
-    logger.info(f"Environment: {settings.ENVIRONMENT}")
-    logger.info(f"Debug Mode: {settings.DEBUG}")
-    logger.info(f"Claude Model: {settings.CLAUDE_MODEL}")
-    logger.info(f"API Key Configured: {bool(settings.ANTHROPIC_API_KEY)}")
-    logger.info("=" * 50)
-
-
-# Shutdown event
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Application shutdown tasks."""
-    logger.info("PipeWrench AI shutting down...")
-    # Cleanup sessions
-    session_count = session_manager.get_session_count()
-    logger.info(f"Cleaning up {session_count} active sessions")
-
-
-# Middleware for automatic session cleanup
-@app.middleware("http")
-async def cleanup_middleware(request: Request, call_next):
-    """Middleware to periodically cleanup expired sessions."""
-    session_manager.maybe_cleanup()
-    response = await call_next(request)
-    return response
+def get_role_context(role_id: str) -> str:
+    """Get context for a specific role"""
+    return JOB_ROLES.get(role_id, JOB_ROLES["general"])["context"]
 
 
 # Helper Functions
@@ -186,116 +121,89 @@ def enforce_whitelist_on_text(text: str) -> str:
     return text + note
 
 
-def extract_text_from_file(content: bytes, filename: str) -> str:
-    """Extract text content from uploaded file."""
-    ext = Path(filename).suffix.lower()
-    
-    if ext == '.txt':
-        try:
-            return content.decode('utf-8')
-        except UnicodeDecodeError:
-            try:
-                return content.decode('latin-1', errors='ignore')
-            except Exception as e:
-                logger.error(f"Failed to decode text file: {e}")
-                raise HTTPException(
-                    status_code=400,
-                    detail="Failed to decode text file. Please ensure it's a valid UTF-8 or Latin-1 encoded file."
-                )
-    
-    elif ext == '.pdf':
-        if PdfReader is None:
-            raise HTTPException(
-                status_code=400,
-                detail="PDF support not available. Please contact administrator."
-            )
-        try:
-            pdf_file = io.BytesIO(content)
-            pdf_reader = PdfReader(pdf_file)
-            text = ""
-            for page_num, page in enumerate(pdf_reader.pages, 1):
-                try:
-                    text += page.extract_text() + "\n"
-                except Exception as e:
-                    logger.warning(f"Failed to extract text from page {page_num}: {e}")
-            
-            if not text.strip():
-                raise HTTPException(
-                    status_code=400,
-                    detail="No text could be extracted from PDF. The file may be image-based or corrupted."
-                )
-            return text
-        except HTTPException:
-            raise
-        except Exception as e:
-            logger.error(f"Failed to parse PDF: {e}")
-            raise HTTPException(
-                status_code=400,
-                detail=f"Failed to parse PDF. The file may be corrupted or password-protected."
-            )
-    
-    elif ext == '.docx':
-        if docx is None:
-            raise HTTPException(
-                status_code=400,
-                detail="Word document support not available. Please contact administrator."
-            )
-        try:
-            doc_file = io.BytesIO(content)
-            doc = docx.Document(doc_file)
-            text = "\n".join([paragraph.text for paragraph in doc.paragraphs])
-            
-            if not text.strip():
-                raise HTTPException(
-                    status_code=400,
-                    detail="No text could be extracted from Word document."
-                )
-            return text
-        except HTTPException:
-            raise
-        except Exception as e:
-            logger.error(f"Failed to parse Word document: {e}")
-            raise HTTPException(
-                status_code=400,
-                detail="Failed to parse Word document. The file may be corrupted."
-            )
-    
-    elif ext == '.doc':
-        raise HTTPException(
-            status_code=400,
-            detail="Old Word format (.doc) not supported. Please convert to .docx, .txt, or PDF."
-        )
-    else:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unsupported file format: {ext}. Please use TXT, PDF, or DOCX."
-        )
+Always reference EPA regulations (40 CFR), state environmental rules, and environmental best practices."""
+    },
+    "safety": {
+        "name": "Safety & Training",
+        "prompt": """You are a specialized AI assistant for Safety & Training.
 
+**Your Expertise:**
+- OSHA regulations (29 CFR 1926, 1910)
+- Workplace safety programs
+- Confined space entry
+- Trenching and excavation safety
+- Personal protective equipment
+- Safety training requirements
+- Accident investigation
 
-# Routes
-@app.get("/", response_class=HTMLResponse)
-async def home():
-    """Serve the main HTML interface."""
-    if HTML_TEMPLATE is None:
-        logger.error("HTML template not loaded")
-        return HTMLResponse(
-            content="<h1>Service Temporarily Unavailable</h1><p>Please contact administrator.</p>",
-            status_code=503
-        )
-    return HTMLResponse(content=HTML_TEMPLATE)
+**Key Responsibilities:**
+- Guide OSHA compliance
+- Recommend safety procedures
+- Assist with training program development
+- Explain PPE requirements
+- Support incident prevention
 
+Always reference OSHA standards (29 CFR), ANSI standards, and safety best practices."""
+    },
+    "administration": {
+        "name": "Administration & Planning",
+        "prompt": """You are a specialized AI assistant for DPW Administration & Planning.
 
-@app.get("/health", response_model=HealthCheckResponse)
-async def health_check():
-    """Health check endpoint for monitoring."""
-    return HealthCheckResponse(
-        status="healthy",
-        timestamp=datetime.now().isoformat(),
-        version="1.1.0",
-        environment=settings.ENVIRONMENT,
-        api_key_configured=bool(settings.ANTHROPIC_API_KEY),
-        active_sessions=session_manager.get_session_count()
-    )
+**Your Expertise:**
+- Capital improvement planning
+- Budget development
+- Asset management
+- Performance metrics
+- Grant administration
+- Public communication
+- Strategic planning
+
+**Key Responsibilities:**
+- Guide planning processes
+- Assist with budget preparation
+- Explain grant requirements
+- Support asset management programs
+- Address administrative procedures
+
+Always reference applicable federal grant requirements, municipal finance best practices, and planning standards."""
+    }
+}
+
+def get_department_prompt(department_id: str) -> str:
+    """Get specialized prompt for department"""
+    return DEPARTMENT_PROMPTS.get(department_id, {}).get("prompt", "")
+
+def get_all_departments():
+    """Return list of all departments"""
+    return [{"id": dept_id, "name": dept_data["name"]} for dept_id, dept_data in DEPARTMENT_PROMPTS.items()]
+
+# ============================================================================
+# SESSION STORAGE
+# ============================================================================
+
+# In-memory session storage (use Redis/database in production)
+sessions: Dict[str, Dict] = {}
+
+# ============================================================================
+# PYDANTIC MODELS
+# ============================================================================
+
+class QueryRequest(BaseModel):
+    session_id: Optional[str] = None
+    query: str
+    role: Optional[str] = "general"
+    department: Optional[str] = None
+
+class UploadResponse(BaseModel):
+    session_id: str
+    filename: str
+    pages: int
+    message: str
+    is_asbuilt: bool = False
+
+class CustomURLRequest(BaseModel):
+    session_id: str
+    url: str
 
 
 @app.get("/api/departments")
@@ -354,61 +262,70 @@ async def whitelist_overview():
         logger.error(f"Failed to get whitelist: {e}")
         raise HTTPException(status_code=500, detail="Failed to retrieve whitelist")
 
+def extract_text_from_asbuilt_pdf(file: UploadFile) -> str:
+    """Extract text from as-built drawing PDF (specialized processing)"""
+    file.file.seek(0)
+    response = requests.post(
+        DRAWING_PROCESSING_API_URL,
+        files={
+            "file": (file.filename, file.file, file.content_type)
+        },
+        data={
+            "ocr_method": "textract"
+        }
+    )
 
-@app.post("/api/session/create", response_model=SessionCreateResponse)
-async def create_session():
-    """Create a new user session."""
+    if response.status_code != 200:
+        raise HTTPException(status_code=400, detail="Error processing as-built PDF")
+    data = response.text
+    return data
+
+def generate_llm_response(query: str, context: str, system_prompt: str, has_document: bool) -> str:
     try:
-        session_id = session_manager.create_session()
-        return SessionCreateResponse(session_id=session_id)
+        message = anthropic_client.messages.create(
+            model="claude-sonnet-4-5",
+            max_tokens=1024,
+            system=system_prompt,
+            messages=[
+                {"role": "assistant", "content": "Use user query and document context to generate response."},
+                {"role": "user", "content": f"User query: {query}\nDocument context: {context}"}
+            ]
+        )
+
+        if message.content and len(message.content) > 0:
+            # Get the first text block
+            return message.content[0].text
+        else:
+            raise HTTPException(status_code=500, detail="Empty response from LLM")
+            
+    except anthropic.APIError as e:
+        raise HTTPException(status_code=500, detail=f"Anthropic API Error: {str(e)}")
     except Exception as e:
-        logger.error(f"Failed to create session: {e}")
-        raise HTTPException(status_code=500, detail="Failed to create session")
+        raise HTTPException(status_code=500, detail=f"Error generating LLM response: {str(e)}")
 
+# ============================================================================
+# API ENDPOINTS
+# ============================================================================
 
-@app.get("/api/session/{session_id}")
-async def get_session(session_id: str):
-    """Get session data."""
-    session = session_manager.get_session(session_id)
-    if session is None:
-        raise HTTPException(status_code=404, detail="Session not found or expired")
-    return session
-
-
-@app.get("/api/session/{session_id}/status", response_model=SessionStatusResponse)
-async def get_session_status(session_id: str):
-    """Get session status information."""
-    status = session_manager.get_session_status(session_id)
-    if status is None:
-        raise HTTPException(status_code=404, detail="Session not found or expired")
-    return SessionStatusResponse(**status)
-
-
-@app.delete("/api/session/{session_id}")
-async def delete_session(session_id: str):
-    """Delete a session."""
-    if session_manager.delete_session(session_id):
-        return {"message": "Session deleted successfully"}
-    raise HTTPException(status_code=404, detail="Session not found")
-
-
-@app.post("/api/query")
-async def query_ai(
-    question: str = Form(...),
-    department: str = Form("general_public_works"),
-    role: Optional[str] = Form(None),
-    session_id: Optional[str] = Form(None),
-    api_key: Optional[str] = Form(None)
-):
-    """Query the AI with a question about uploaded documents."""
-    logger.info(f"Query request - Department: {department}, Role: {role}, Session: {session_id}")
+@app.post("/upload")
+async def upload_document(file: UploadFile = File(...), is_asbuilt: bool = False):
+    """Upload and process PDF document"""
+    
+    if not file.filename.endswith('.pdf'):
+        raise HTTPException(status_code=400, detail="Only PDF files are supported")
     
     # Validate inputs
     if not question or len(question.strip()) == 0:
         raise HTTPException(status_code=400, detail="Question cannot be empty")
     
-    if len(question) > 2000:
-        raise HTTPException(status_code=400, detail="Question too long. Maximum 2000 characters.")
+    # Extract text
+    if is_asbuilt:
+        # Specialized processing for as-built drawings can be added here
+        file.file.seek(0)
+        text = extract_text_from_asbuilt_pdf(file)
+    else:
+        # Read file
+        text = extract_text_from_pdf(content)
     
     # Get or create Anthropic client
     anthropic_client = None
@@ -421,48 +338,32 @@ async def query_ai(
     else:
         anthropic_client = client
     
-    if anthropic_client is None:
-        raise HTTPException(
-            status_code=503,
-            detail="API key not configured. Please provide your Anthropic API key."
-        )
+    # Store in session
+    sessions[session_id] = {
+        "filename": file.filename,
+        "text": text,
+        "uploaded_at": "timestamp_here",
+        "is_asbuilt": is_asbuilt
+    }
     
     # Build system prompt
     system_prompt = build_system_prompt(department, role)
     
-    # Make API call
-    try:
-        logger.info(f"Calling Claude API with model: {settings.CLAUDE_MODEL}")
-        response = anthropic_client.messages.create(
-            model=settings.CLAUDE_MODEL,
-            max_tokens=4096,
-            system=system_prompt,
-            messages=[{"role": "user", "content": question}]
-        )
-        
-        answer = response.content[0].text
-        answer = enforce_whitelist_on_text(answer)
-        
-        # Store in session if provided
-        if session_id:
-            session = session_manager.get_session(session_id)
-            if session:
-                session["questions"].append({
-                    "question": question,
-                    "answer": answer,
-                    "department": get_department_name(department),
-                    "role": get_role_info(role)["title"] if role and get_role_info(role) else None,
-                    "timestamp": datetime.now().isoformat()
-                })
-                logger.info(f"Stored query in session {session_id}")
-            else:
-                logger.warning(f"Session {session_id} not found for storing query")
-        
-        return QueryResponse(
-            answer=answer,
-            department=get_department_name(department),
-            timestamp=datetime.now().isoformat()
-        )
+    return UploadResponse(
+        session_id=session_id,
+        filename=file.filename,
+        pages=page_count,
+        message=f"Successfully uploaded {file.filename} ({page_count} pages)",
+        is_asbuilt=is_asbuilt
+    )
+
+@app.post("/query")
+async def query_documents(request: QueryRequest):
+    """Query with or without uploaded documents"""
+    
+    # Get document context if session exists
+    document_text = ""
+    has_document = False
     
     except APIError as e:
         logger.error(f"Anthropic API error: {e}")
@@ -494,95 +395,16 @@ async def upload_document(
     if session is None:
         raise HTTPException(status_code=404, detail="Session not found or expired")
     
-    # Validate file extension
-    if not validate_file_extension(file.filename):
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unsupported file type. Allowed types: {', '.join(settings.ALLOWED_FILE_EXTENSIONS)}"
-        )
-    
-    try:
-        # Read file content
-        content = await file.read()
-        file_size = len(content)
-        
-        # Check file size
-        if file_size > settings.MAX_FILE_SIZE_BYTES:
-            raise HTTPException(
-                status_code=400,
-                detail=f"File too large. Maximum size is {settings.MAX_FILE_SIZE_MB}MB. "
-                       f"Your file is {format_file_size(file_size)}."
-            )
-        
-        logger.info(f"Processing file: {file.filename}, Size: {format_file_size(file_size)}")
-        
-        # Extract text
-        text_content = extract_text_from_file(content, file.filename)
-        
-        # Truncate if too long
-        if len(text_content) > settings.MAX_TEXT_CHARS:
-            logger.warning(f"File content truncated from {len(text_content)} to {settings.MAX_TEXT_CHARS} chars")
-            text_content = text_content[:settings.MAX_TEXT_CHARS] + "\n\n[Content truncated due to size...]"
-        
-        if not text_content.strip():
-            raise HTTPException(
-                status_code=400,
-                detail="No text content found in document. Please ensure the file contains readable text."
-            )
-        
-        # Get or create Anthropic client
-        anthropic_client = None
-        if api_key:
-            try:
-                anthropic_client = Anthropic(api_key=api_key)
-            except Exception as e:
-                logger.error(f"Failed to create client with provided API key: {e}")
-                raise HTTPException(status_code=400, detail="Invalid API key provided")
-        else:
-            anthropic_client = client
-        
-        if anthropic_client is None:
-            raise HTTPException(
-                status_code=503,
-                detail="API key not configured. Please provide your Anthropic API key."
-            )
-        
-        # Build system prompt
-        system_prompt = build_system_prompt(department, role)
-        
-        # Analyze document
-        logger.info(f"Analyzing document with Claude API")
-        response = anthropic_client.messages.create(
-            model=settings.CLAUDE_MODEL,
-            max_tokens=4096,
-            system=system_prompt + "\n\nAnalyze this document and extract key institutional knowledge, procedures, and important information. Provide citations from whitelisted sources only.",
-            messages=[{
-                "role": "user",
-                "content": f"Document: {file.filename}\n\nContent:\n{text_content}"
-            }]
-        )
-        
-        analysis = response.content[0].text
-        analysis = enforce_whitelist_on_text(analysis)
-        
-        # Store in session
-        session["documents"].append({
-            "filename": file.filename,
-            "analysis": analysis,
-            "department": get_department_name(department),
-            "role": get_role_info(role)["title"] if role and get_role_info(role) else None,
-            "uploaded_at": datetime.now().isoformat(),
-            "file_size": format_file_size(file_size)
-        })
-        
-        logger.info(f"Document {file.filename} analyzed and stored successfully")
-        
-        return DocumentUploadResponse(
-            filename=file.filename,
-            analysis=analysis,
-            department=get_department_name(department),
-            file_size=format_file_size(file_size)
-        )
+    # Generate response (replace with actual LLM call)
+    if has_document:
+        # response = generate_llm_response(request.query, document_text, system_prompt, has_document)
+        response = generate_llm_response(request.query, document_text, system_prompt, has_document)
+    else:
+        response = generate_mock_response(request.query, document_text, system_prompt, has_document)
+
+    sources = ["whitelisted_urls"]
+    if has_document:
+        sources.insert(0, "uploaded_document")
     
     except HTTPException:
         raise
@@ -684,15 +506,34 @@ async def generate_report(session_id: str = Form(...)):
 </head>
 <body>
     <div class="container">
-        <h1>🔧 PipeWrench AI - Knowledge Capture Report</h1>
-        <p class="metadata">Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
-        <p class="metadata">Session ID: {sanitize_html(session_id)}</p>
-        
-        <div class="stats">
-            <strong>Session Statistics:</strong><br>
-            Documents Analyzed: {len(session["documents"])}<br>
-            Questions Answered: {len(session["questions"])}<br>
-            Created: {session["created_at"].strftime('%Y-%m-%d %H:%M:%S')}
+        <div class="header">
+            <h1>🏗️ Municipal DPW Knowledge Capture System</h1>
+            <p>AI-Powered Infrastructure Knowledge Base with Source Verification</p>
+        </div>
+
+        <div id="alertBox" class="alert"></div>
+
+        <!-- Upload Section (Optional) -->
+        <div class="card">
+            <h2>📄 Upload Document (Optional)</h2>
+            <p style="color: #666; margin-bottom: 15px;">Upload a PDF to query your own documents, or skip to query whitelisted sources directly.</p>
+            <div class="upload-zone" id="uploadZone">
+                <div class="upload-icon">📁</div>
+                <div>Drag & drop your PDF here or click to browse</div>
+                <div style="color: #999; font-size: 0.9em; margin-top: 10px;">PDF files only</div>
+                <input type="file" id="fileInput" accept=".pdf" onchange="handleFileSelect(event)">
+            </div>
+
+            <!-- As-Built Checkbox -->
+            <div style="margin-top: 15px; padding: 15px; background: #f0f8ff; border-radius: 8px;">
+                <label style="display: flex; align-items: center; cursor: pointer; font-weight: 500; color: #333;">
+                    <input type="checkbox" id="asBuiltCheckbox" style="width: auto; margin-right: 10px; cursor: pointer;">
+                    <span>📐 This is an As-Built/Record Drawing</span>
+                </label>
+                <p style="margin: 8px 0 0 32px; color: #666; font-size: 0.9em;">
+                    Check this if uploading construction as-built drawings or record documents
+                </p>
+            </div>
         </div>
         
         <h2>📄 Documents Analyzed ({len(session["documents"])})</h2>
@@ -736,6 +577,266 @@ async def generate_report(session_id: str = Form(...)):
             <p>Built with Claude 3.5 Sonnet by Anthropic</p>
         </div>
     </div>
+
+    <script>
+        let sessionId = null;
+
+        // Load configuration
+        async function loadConfiguration() {
+            try {
+                const rolesResponse = await fetch('/roles');
+                const roles = await rolesResponse.json();
+                const roleSelect = document.getElementById('roleSelect');
+                roleSelect.innerHTML = roles.map(role => 
+                    `<option value="${role.id}">${role.name}</option>`
+                ).join('');
+
+                const deptsResponse = await fetch('/departments');
+                const depts = await deptsResponse.json();
+                const deptSelect = document.getElementById('departmentSelect');
+                deptSelect.innerHTML = '<option value="">Select Department</option>' +
+                    depts.map(dept => 
+                        `<option value="${dept.id}">${dept.name}</option>`
+                    ).join('');
+            } catch (error) {
+                console.error('Error loading configuration:', error);
+            }
+        }
+
+        // Drag and drop
+        const uploadZone = document.getElementById('uploadZone');
+
+        uploadZone.addEventListener('click', () => {
+            document.getElementById('fileInput').click();
+        });
+
+        uploadZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadZone.classList.add('dragover');
+        });
+
+        uploadZone.addEventListener('dragleave', () => {
+            uploadZone.classList.remove('dragover');
+        });
+
+        uploadZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadZone.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                handleFile(file);
+            }
+        }
+
+        async function handleFile(file) {
+            if (!file.name.endsWith('.pdf')) {
+                showAlert('Please upload a PDF file', 'error');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            // Get checkbox value
+            const isAsBuilt = document.getElementById('asBuiltCheckbox').checked;
+
+            showAlert('Uploading and processing document...', 'info');
+
+            try {
+                // Send is_asbuilt as query parameter
+                const url = `/upload?is_asbuilt=${isAsBuilt}`;
+                const response = await fetch(url, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    sessionId = data.session_id;
+                    showAlert(`✅ ${data.message}`, 'success');
+                    document.getElementById('responseSection').style.display = 'block';
+                    
+                    // Generate temporary session ID for custom URLs
+                    if (!sessionId) {
+                        sessionId = 'temp_' + Date.now();
+                    }
+                    loadCustomUrls();
+                } else {
+                    showAlert(`Error: ${data.detail}`, 'error');
+                }
+            } catch (error) {
+                showAlert(`Error uploading file: ${error.message}`, 'error');
+            }
+        }
+
+        async function submitQuery() {
+            const query = document.getElementById('queryInput').value.trim();
+            if (!query) {
+                showAlert('Please enter a question', 'error');
+                return;
+            }
+
+            const role = document.getElementById('roleSelect').value;
+            const department = document.getElementById('departmentSelect').value;
+
+            // Generate temporary session ID if none exists
+            if (!sessionId) {
+                sessionId = 'temp_' + Date.now();
+            }
+
+            showAlert('Processing your question...', 'info');
+
+            try {
+                const response = await fetch('/query', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        session_id: sessionId,
+                        query: query,
+                        role: role,
+                        department: department || null
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    document.getElementById('responseBox').textContent = data.answer;
+                    document.getElementById('responseSection').style.display = 'block';
+                    showAlert('✅ Response generated', 'success');
+                } else {
+                    showAlert(`Error: ${data.detail}`, 'error');
+                }
+            } catch (error) {
+                showAlert(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        function handleQueryKeyPress(event) {
+            if (event.key === 'Enter') {
+                submitQuery();
+            }
+        }
+
+        async function addCustomUrl() {
+            const urlInput = document.getElementById('customUrlInput');
+            const url = urlInput.value.trim();
+
+            if (!url) {
+                showAlert('Please enter a URL', 'error');
+                return;
+            }
+
+            // Generate temporary session ID if none exists
+            if (!sessionId) {
+                sessionId = 'temp_' + Date.now();
+            }
+
+            try {
+                const response = await fetch('/custom-url/add', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        session_id: sessionId,
+                        url: url
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showAlert('✅ URL added successfully', 'success');
+                    urlInput.value = '';
+                    loadCustomUrls();
+                } else {
+                    showAlert(`Error: ${data.detail}`, 'error');
+                }
+            } catch (error) {
+                showAlert(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function loadCustomUrls() {
+            if (!sessionId) return;
+
+            try {
+                const response = await fetch(`/custom-url/list/${sessionId}`);
+                const data = await response.json();
+
+                const listDiv = document.getElementById('customUrlList');
+                if (data.custom_urls.length === 0) {
+                    listDiv.innerHTML = '<p style="color: #666; font-size: 0.9em; margin-top: 10px;">No custom URLs added yet</p>';
+                } else {
+                    listDiv.innerHTML = data.custom_urls.map(url => `
+                        <div class="url-item">
+                            <span>${url}</span>
+                            <button class="btn-remove" onclick="removeCustomUrl('${url}')">Remove</button>
+                        </div>
+                    `).join('');
+                }
+            } catch (error) {
+                console.error('Error loading custom URLs:', error);
+            }
+        }
+
+        async function removeCustomUrl(url) {
+            try {
+                const response = await fetch('/custom-url/remove', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        session_id: sessionId,
+                        url: url
+                    })
+                });
+
+                if (response.ok) {
+                    showAlert('✅ URL removed', 'success');
+                    loadCustomUrls();
+                } else {
+                    showAlert('Error removing URL', 'error');
+                }
+            } catch (error) {
+                showAlert(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        function showAlert(message, type) {
+            const alertBox = document.getElementById('alertBox');
+            alertBox.textContent = message;
+            alertBox.className = `alert alert-${type} show`;
+
+            if (type === 'success') {
+                setTimeout(() => {
+                    alertBox.classList.remove('show');
+                }, 5000);
+            }
+        }
+
+        function toggleFooter() {
+            const content = document.getElementById('footerContent');
+            const arrow = document.getElementById('footerArrow');
+            content.classList.toggle('show');
+            arrow.classList.toggle('expanded');
+        }
+
+        // Initialize
+        loadConfiguration();
+    </script>
 </body>
 </html>
 """
