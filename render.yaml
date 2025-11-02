@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: pipewrench-ai
+    env: python
+    plan: free
+    region: oregon
+    buildCommand: ./\.render-build.sh
+    startCommand: uvicorn app_combined:app --host 0.0.0.0 --port $PORT
+    autoDeploy: true
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: DRAWING_PROCESSING_API_URL
+        value: http://localhost:8001/parse
+      - key: PYTHON_VERSION
+        value: 3.11.9
+    healthCheckPath: /
+    headers:
+      - path: /*
+        name: Access-Control-Allow-Origin
+        value: "*"
+      - path: /*
+        name: Access-Control-Allow-Methods
+        value: "GET,POST,PUT,DELETE,OPTIONS"
+      - path: /*
+        name: Access-Control-Allow-Headers
+        value: "Content-Type,Authorization"
