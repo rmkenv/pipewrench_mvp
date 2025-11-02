@@ -1,8 +1,8 @@
 """
 PipeWrench AI - Municipal DPW Knowledge Capture System
-FastAPI application with improved error handling, logging, and production readiness.
+FastAPI application with Vercel compatibility.
 """
-# Force redeploy timestamp: 2025-10-31 13:15:00 UTC - URL whitelist fix
+# Force redeploy timestamp: 2025-11-02 09:50:00 EST - Vercel compatibility update
 
 from fastapi import FastAPI, Form, UploadFile, File, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -16,14 +16,12 @@ import io
 import re
 from urllib.parse import urlparse
 import requests
-import dotenv
 import logging
+from vercel_fastapi import VercelFastAPI  # For Vercel compatibility
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-dotenv.load_dotenv()
 
 app = FastAPI()
 
@@ -37,16 +35,8 @@ app.add_middleware(
 )
 
 # ============================================================================
-# URL WHITELIST CONFIGURATION - Import from actual config file
-# ============================================================================
-
-t# ============================================================================
 # URL WHITELIST CONFIGURATION - TEMPORARY BYPASS
 # ============================================================================
-
-# Temporary bypass - copy the essential functions directly into main.py
-# This will get your app running immediately
-
 WHITELISTED_URLS = [
     {"url": "https://www.epa.gov", "description": "EPA Regulations"},
     {"url": "https://www.osha.gov", "description": "OSHA Standards"},
@@ -91,7 +81,6 @@ anthropic_client = Anthropic(api_key=ANTHROPIC_API_KEY) if ANTHROPIC_API_KEY els
 # ============================================================================
 # CONFIGURATION: JOB ROLES
 # ============================================================================
-
 JOB_ROLES = {
     "general": {
         "name": "General DPW Staff",
@@ -130,7 +119,6 @@ JOB_ROLES = {
 # ============================================================================
 # CONFIGURATION: DEPARTMENTS
 # ============================================================================
-
 DEPARTMENT_PROMPTS = {
     "general_public_works": {
         "name": "General Public Works",
@@ -161,7 +149,6 @@ DEPARTMENT_PROMPTS = {
 # ============================================================================
 # HELPER FUNCTIONS
 # ============================================================================
-
 def get_role_list():
     """Return list of available roles"""
     return [{"id": role_id, "name": role_data["name"]} for role_id, role_data in JOB_ROLES.items()]
@@ -289,7 +276,6 @@ def sanitize_html(text: str) -> str:
 # ============================================================================
 # SESSION MANAGEMENT
 # ============================================================================
-
 class SessionManager:
     """Simple session manager"""
     
@@ -316,7 +302,6 @@ session_manager = SessionManager()
 # ============================================================================
 # PYDANTIC MODELS
 # ============================================================================
-
 class QueryRequest(BaseModel):
     session_id: Optional[str] = None
     query: str
@@ -348,7 +333,6 @@ class SystemInfoResponse(BaseModel):
 # ============================================================================
 # API ENDPOINTS
 # ============================================================================
-
 @app.get("/")
 async def root():
     return {"message": "PipeWrench AI API", "status": "running"}
@@ -721,4 +705,4 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 # For Vercel
-handler = app
+handler = VercelFastAPI(app)
