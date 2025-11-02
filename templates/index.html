@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PipeWrench AI - Municipal Knowledge Capture</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --primary-blue: #1e40af;
+      --secondary-blue: #3b82f6;
+      --light-blue: #eff6ff;
+      --accent-orange: #f59e0b;
+      --dark-orange: #d97706;
+      --bg-dark: #0f172a;
+      --bg-card: #1e293b;
+      --text-light: #f1f5f9;
+      --text-muted: #94a3b8;
+      --border: #334155;
+      --ok: #10b981;
+      --error: #ef4444;
+    }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, var(--bg-dark) 0%, #1e293b 100%);
+      color: var(--text-light);
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: var(--bg-card);
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+      overflow: hidden;
+    }
+    header {
+      background: linear-gradient(135deg, var(--primary-blue) 0%, var(--secondary-blue) 100%);
+      padding: 40px;
+      text-align: center;
+      border-bottom: 4px solid var(--accent-orange);
+    }
+    header h1 {
+      font-size: 2.5em;
+      margin-bottom: 10px;
+      color: white;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    }
+    header p { font-size: 1.1em; color: var(--light-blue); opacity: 0.95; }
+    .statusbar {
+      display: flex; justify-content: center; gap: 16px; flex-wrap: wrap; margin-top: 12px;
+      font-size: 0.95em;
+    }
+    .pill {
+      background: rgba(148,163,184,0.15);
+      border: 1px solid var(--border);
+      color: var(--text-light);
+      padding: 6px 10px; border-radius: 999px;
+    }
+
+    .tabs { display: flex; background: var(--bg-dark); border-bottom: 2px solid var(--border); overflow-x: auto; }
+    .tab-btn {
+      flex: 1; padding: 18px 24px; background: transparent; border: none; color: var(--text-muted);
+      font-size: 1em; font-weight: 600; cursor: pointer; transition: all 0.3s ease;
+      border-bottom: 3px solid transparent; white-space: nowrap;
+    }
+    .tab-btn:hover { background: rgba(59,130,246,0.1); color: var(--secondary-blue); }
+    .tab-btn.active { color: var(--accent-orange); border-bottom-color: var(--accent-orange); background: rgba(245,158,11,0.1); }
+    .tab-content { display: none; padding: 40px; animation: fadeIn 0.3s ease; }
+    .tab-content.active { display: block; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px) } to { opacity: 1; transform: translateY(0) } }
+
+    h2 { color: var(--secondary-blue); margin-bottom: 24px; font-size: 1.8em; border-bottom: 2px solid var(--border); padding-bottom: 12px; }
+    .form-row { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 16px; }
+    .form-group { margin-bottom: 20px; }
+    label { display: block; margin-bottom: 8px; color: var(--text-light); font-weight: 600; font-size: 0.95em; }
+    .form-control {
+      width: 100%; padding: 14px 16px; background: var(--bg-dark); border: 2px solid var(--border);
+      border-radius: 8px; color: var(--text-light); font-size: 1em; transition: all 0.3s ease; font-family: inherit;
+    }
+    .form-control:focus { outline: none; border-color: var(--secondary-blue); box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
+    textarea.form-control { resize: vertical; min-height: 120px; }
+    .btn { padding: 14px 20px; border: none; border-radius: 8px; font-size: 1em; font-weight: 600; cursor: pointer; transition: all 0.2s ease; text-transform: uppercase; letter-spacing: 0.5px; }
+    .btn-primary { background: linear-gradient(135deg, var(--accent-orange) 0%, var(--dark-orange) 100%); color: white; box-shadow: 0 4px 12px rgba(245,158,11,0.3); }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(245,158,11,0.4); }
+    .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+    .answer-box {
+      background: var(--bg-dark);
+      border-left: 4px solid var(--secondary-blue);
+      padding: 16px; border-radius: 8px; margin-top: 16px; line-height: 1.7; color: var(--text-light); white-space: pre-wrap;
+    }
+    .note { color: var(--text-muted); font-size: 0.9em; margin-top: 6px; }
+
+    .spinner {
+      border: 3px solid var(--border);
+      border-top: 3px solid var(--accent-orange);
+      border-radius: 50%;
+      width: 34px; height: 34px;
+      animation: spin 1s linear infinite;
+      margin: 16px auto; display: none;
+    }
+    @keyframes spin { 0%{transform:rotate(0)}100%{transform:rotate(360deg)} }
+
+    .alert {
+      background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.35);
+      padding: 12px 14px; border-radius: 8px; color: #fca5a5; margin-top: 12px;
+    }
+
+    footer {
+      background: var(--bg-dark); padding: 28px 40px; border-top: 2px solid var(--border);
+      color: var(--text-muted); font-size: 0.95em; line-height: 1.6;
+    }
+    footer h4 { color: var(--secondary-blue); margin-bottom: 10px; font-size: 1.05em; }
+    footer a { color: var(--accent-orange); text-decoration: none; }
+    footer a:hover { color: var(--dark-orange); text-decoration: underline; }
+
+    @media (max-width: 768px) {
+      header h1 { font-size: 1.9em; }
+      .tab-content { padding: 24px; }
+      .form-row { grid-template-columns: 1fr; }
+      .tabs { flex-wrap: wrap; }
+      .tab-btn { flex: 1 1 50%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🔧 PipeWrench AI</h1>
+      <p>Preserving Institutional Knowledge in Public Works</p>
+      <div class="statusbar">
+        <span class="pill" id="status-api">API: checking…</span>
+        <span class="pill" id="status-anthropic">Anthropic: unset</span>
+        <span class="pill" id="status-whitelist">Whitelist: …</span>
+      </div>
+    </header>
+
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="query">Ask Questions</button>
+      <button class="tab-btn" data-tab="upload">Upload Documents</button>
+      <button class="tab-btn" data-tab="report">Generate Report</button>
+      <button class="tab-btn" data-tab="settings">Settings</button>
+    </div>
+
+    <div id="query" class="tab-content active">
+      <h2>Ask a Question</h2>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="department">Department</label>
+          <select id="department" class="form-control">
+            <option value="">Loading…</option>
+          </select>
+          <div class="note">Choose the department context to guide the assistant.</div>
+        </div>
+        <div class="form-group">
+          <label for="role">Job Role (optional)</label>
+          <select id="role" class="form-control">
+            <option value="">None</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="question">Your Question</label>
+        <textarea id="question" class="form-control" placeholder="e.g., What are proper procedures for confined space entry in a wastewater lift station?"></textarea>
+        <div class="note">Press Ctrl+Enter to submit.</div>
+      </div>
+
+      <button id="askBtn" class="btn btn-primary">Ask Question</button>
+      <div class="spinner" id="query-spinner"></div>
+
+      <div id="answer-container" style="display:none;">
+        <h3 style="color:var(--accent-orange); margin-top: 8px;">Answer</h3>
+        <div id="answer" class="answer-box"></div>
+        <div class="note" id="sources" style="margin-top:8px;"></div>
+      </div>
+      <div id="query-error" class="alert" style="display:none;"></div>
+    </div>
+
+    <div id="upload" class="tab-content">
+      <h2>Upload Document</h2>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="upload-department">Department</label>
+          <select id="upload-department" class="form-control"></select>
+        </div>
+        <div class="form-group">
+          <label for="upload-role">Job Role (optional)</label>
+          <select id="upload-role" class="form-control">
+            <option value="">None</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="file">Select PDF</label>
+        <input type="file" id="file" class="form-control" accept=".pdf" />
+        <small class="note">PDF only (max 10MB). Check “as-built” below for drawings.</small>
+      </div>
+
+      <div class="form-group">
+        <label><input type="checkbox" id="asbuilt" /> As-built drawing</label>
+      </div>
+
+      <button id="uploadBtn" class="btn btn-primary">Upload & Analyze</button>
+      <div class="spinner" id="upload-spinner"></div>
+
+      <div id="upload-result" style="display:none;">
+        <h3 style="color:var(--accent-orange);">Analysis</h3>
+        <div id="analysis" class="answer-box"></div>
+      </div>
+      <div id="upload-error" class="alert" style="display:none;"></div>
+    </div>
+
+    <div id="report" class="tab-content">
+      <h2>Generate Report</h2>
+      <p class="note" style="margin-bottom: 18px;">
+        Generate a comprehensive report with Q&A and any uploaded document summaries for this session.
+      </p>
+      <button id="reportBtn" class="btn btn-primary">Generate Report</button>
+      <div id="report-error" class="alert" style="display:none;"></div>
+    </div>
+
+    <div id="settings" class="tab-content">
+      <h2>Settings</h2>
+      <div class="form-group">
+        <label for="api-key">Anthropic API Key (optional)</label>
+        <input type="password" id="api-key" class="form-control" placeholder="sk-ant-…" />
+        <small class="note">Saved in your browser and used only for API calls.</small>
+      </div>
+      <button id="saveBtn" class="btn btn-primary">Save Settings</button>
+
+      <div style="margin-top: 24px; padding: 16px; background: var(--bg-dark); border-radius: 8px; border-left: 4px solid var(--accent-orange);">
+        <h4 style="color:var(--accent-orange); margin-bottom: 8px;">About PipeWrench AI</h4>
+        <p class="note">
+          Answers follow strict citation rules from approved sources and anti-hallucination protocols.
+        </p>
+      </div>
+    </div>
+
+    <footer>
+      <div style="display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 18px;">
+        <div>
+          <h4>Privacy</h4>
+          <p>Session data is temporary. API keys are stored locally and only used for Anthropic API calls.</p>
+        </div>
+        <div>
+          <h4>Transparency</h4>
+          <p>Model: Anthropic Claude. See Anthropic’s data transparency and commercial terms for details.</p>
+        </div>
+      </div>
+      <p style="margin-top: 16px; border-top: 1px solid var(--border); padding-top: 12px;">
+        © 2025 PipeWrench AI. Built for municipal public works professionals.
+      </p>
+    </footer>
+  </div>
+
+  <script>
+    // Same-origin API
+    const API = '';
+
+    let sessionId = null;
+    let apiKey = null;
+
+    // Tabs
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tab = btn.dataset.tab;
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        document.getElementById(tab).classList.add('active');
+      });
+    });
+
+    // Status pills
+    function setPill(id, text) { const el = document.getElementById(id); if (el) el.textContent = text; }
+
+    window.addEventListener('load', async () => {
+      loadSettings();
+      await bootstrap();
+    });
+
+    async function bootstrap() {
+      try {
+        // Ping API
+        const root = await fetch(`${API}/`).then(r => r.json()).catch(() => null);
+        setPill('status-api', root ? 'API: online' : 'API: offline');
+
+        // System data
+        const sys = await fetch(`${API}/api/system`).then(r => r.json());
+        setPill('status-whitelist', `Whitelist: ${sys.total_whitelisted_urls}`);
+
+        // Departments
+        const depts = await fetch(`${API}/api/departments`).then(r => r.json());
+        fillSelect('department', depts.departments, 'general_public_works');
+        fillSelect('upload-department', depts.departments, 'general_public_works');
+
+        // Roles
+        const roles = await fetch(`${API}/api/roles`).then(r => r.json());
+        fillSelect('role', roles.roles, '');
+        fillSelect('upload-role', roles.roles, '');
+
+        // Session id: generated client-side so it persists across tabs
+        if (!sessionId) {
+          sessionId = `session_${Date.now()}`;
+          console.log('Session:', sessionId);
+        }
+      } catch (err) {
+        console.error(err);
+        setPill('status-api', 'API: error');
+      }
+    }
+
+    function fillSelect(id, items, defaultValue) {
+      const sel = document.getElementById(id);
+      sel.innerHTML = '';
+      if (id === 'role') {
+        const none = document.createElement('option');
+        none.value = '';
+        none.textContent = 'None';
+        sel.appendChild(none);
+      }
+      (items || []).forEach(it => {
+        const opt = document.createElement('option');
+        opt.value = it.value || it; // supports string arrays
+        opt.textContent = it.name || it.title || it.value || it;
+        sel.appendChild(opt);
+      });
+      if (defaultValue !== undefined && defaultValue !== null) sel.value = defaultValue;
+    }
+
+    // Ask question
+    document.getElementById('askBtn').addEventListener('click', askQuestion);
+    document.getElementById('question').addEventListener('keydown', e => {
+      if (e.key === 'Enter' && e.ctrlKey) askQuestion();
+    });
+
+    async function askQuestion() {
+      const q = document.getElementById('question').value.trim();
+      const dept = document.getElementById('department').value || 'general_public_works';
+      const role = document.getElementById('role').value || null;
+
+      if (!q) { showError('query-error', 'Please enter a question.'); return; }
+      toggleSpinner('query-spinner', true);
+      hide('query-error'); hide('answer-container');
+
+      try {
+        const res = await fetch(`${API}/query`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: q, session_id: sessionId, department: dept, role })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Request failed');
+
+        document.getElementById('answer').textContent = data.answer || '';
+        const srcDiv = document.getElementById('sources');
+        srcDiv.textContent = (data.sources || []).join(' · ');
+        show('answer-container');
+      } catch (err) {
+        showError('query-error', err.message);
+      } finally {
+        toggleSpinner('query-spinner', false);
+      }
+    }
+
+    // Upload document
+    document.getElementById('uploadBtn').addEventListener('click', uploadDocument);
+    async function uploadDocument() {
+      const fileInput = document.getElementById('file');
+      const dept = document.getElementById('upload-department').value || 'general_public_works';
+      const role = document.getElementById('upload-role').value || '';
+
+      if (!fileInput.files[0]) { showError('upload-error', 'Please select a PDF.'); return; }
+      const file = fileInput.files[0];
+      if (!file.name.toLowerCase().endsWith('.pdf')) { showError('upload-error', 'Only PDF files are supported.'); return; }
+      if (file.size > 10 * 1024 * 1024) { showError('upload-error', 'File too large. Max 10MB.'); return; }
+
+      toggleSpinner('upload-spinner', true);
+      hide('upload-error'); hide('upload-result');
+
+      const form = new FormData();
+      form.append('file', file);
+      form.append('session_id', sessionId);
+      form.append('department', dept);
+      if (role) form.append('role', role);
+
+      try {
+        const res = await fetch(`${API}/api/document/upload`, { method: 'POST', body: form });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Upload failed');
+
+        document.getElementById('analysis').textContent =
+          `Uploaded ${data.filename} • ${data.pages} page(s).\nSession: ${data.session_id}`;
+        show('upload-result');
+        fileInput.value = '';
+      } catch (err) {
+        showError('upload-error', err.message);
+      } finally {
+        toggleSpinner('upload-spinner', false);
+      }
+    }
+
+    // Report
+    document.getElementById('reportBtn').addEventListener('click', generateReport);
+    async function generateReport() {
+      const form = new FormData();
+      form.append('session_id', sessionId);
+      try {
+        const res = await fetch(`${API}/api/report/generate`, { method: 'POST', body: form });
+        if (!res.ok) throw new Error('Report generation failed');
+        const html = await res.text();
+        const w = window.open('', '_blank'); w.document.write(html); w.document.close();
+      } catch (err) {
+        showError('report-error', err.message);
+      }
+    }
+
+    // Settings
+    document.getElementById('saveBtn').addEventListener('click', () => {
+      apiKey = document.getElementById('api-key').value.trim();
+      if (apiKey) { localStorage.setItem('anthropic_api_key', apiKey); setPill('status-anthropic', 'Anthropic: set'); alert('Saved'); }
+      else { localStorage.removeItem('anthropic_api_key'); setPill('status-anthropic', 'Anthropic: unset'); alert('Cleared'); }
+    });
+    function loadSettings() {
+      const saved = localStorage.getItem('anthropic_api_key');
+      if (saved) {
+        apiKey = saved; document.getElementById('api-key').value = saved;
+        setPill('status-anthropic', 'Anthropic: set');
+      } else setPill('status-anthropic', 'Anthropic: unset');
+    }
+
+    // Utilities
+    function toggleSpinner(id, on) { const el = document.getElementById(id); if (el) el.style.display = on ? 'block' : 'none'; }
+    function show(id) { const el = document.getElementById(id); if (el) el.style.display = 'block'; }
+    function hide(id) { const el = document.getElementById(id); if (el) el.style.display = 'none'; }
+    function showError(id, msg) { const el = document.getElementById(id); if (el) { el.textContent = msg; el.style.display = 'block'; } }
+  </script>
+</body>
+</html>
