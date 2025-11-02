@@ -8,3 +8,5 @@ jinja2
 pycryptodome
 python-dotenv
 requests
+Flask
+python-multipart
