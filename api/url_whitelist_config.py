@@ -10,6 +10,7 @@ from urllib.parse import urlparse
 from typing import List, Dict
 import json
 import os
+import re
 
 # Base whitelisted URLs (federal and state sources)
 BASE_WHITELISTED_URLS = [
@@ -18,7 +19,7 @@ BASE_WHITELISTED_URLS = [
     {"url": "https://www.osha.gov/laws-regs/regulations/standardnumber/1926", "include_children": True},
     {"url": "https://www.osha.gov/construction", "include_children": True},
     {"url": "https://www.epa.gov/eg/construction-and-development-effluent-guidelines", "include_children": True},
-    {"url": "https://www.epa.gov/laws-regulations", "include_children": True},
+    {"url": "https://www.epa.gov/laws-regments", "include_children": True},
     {"url": "https://www.epa.gov/sites/default/files/2015-10/documents/myerguide.pdf", "include_children": True},
     {"url": "https://www.cem.va.gov/pdf/fedreqs.pdf", "include_children": True},
     {"url": "https://www.transportation.gov/roadways-and-bridges", "include_children": True},
@@ -143,6 +144,9 @@ BASE_WHITELISTED_URLS = [
 
 # Path to custom URLs file
 CUSTOM_URLS_FILE = os.path.join(os.path.dirname(__file__), "custom_whitelist.json")
+
+# URL regex pattern for finding URLs in text
+URL_REGEX = re.compile(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+')
 
 def load_custom_urls() -> List[Dict[str, any]]:
     """Load custom URLs from JSON file"""
