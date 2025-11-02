@@ -10,3 +10,4 @@ python-dotenv
 requests
 Flask
 python-multipart
+vercel-fastapi
