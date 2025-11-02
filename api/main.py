@@ -40,63 +40,45 @@ app.add_middleware(
 # URL WHITELIST CONFIGURATION - Import from actual config file
 # ============================================================================
 
-try:
-    # Try to import the actual functions
-    from url_whitelist_config import (
-        WHITELISTED_URLS,
-        get_whitelisted_domains,
-        get_all_whitelisted_urls,
-        is_url_whitelisted,
-        URL_REGEX
-    )
-    
-    # The function exists in your file, but let's be safe
+t# ============================================================================
+# URL WHITELIST CONFIGURATION - TEMPORARY BYPASS
+# ============================================================================
+
+# Temporary bypass - copy the essential functions directly into main.py
+# This will get your app running immediately
+
+WHITELISTED_URLS = [
+    {"url": "https://www.epa.gov", "description": "EPA Regulations"},
+    {"url": "https://www.osha.gov", "description": "OSHA Standards"},
+    {"url": "https://www.fhwa.dot.gov", "description": "FHWA Standards"},
+    {"url": "https://www.awwa.org", "description": "Water Standards"},
+]
+
+URL_REGEX = re.compile(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+')
+
+def get_whitelisted_domains():
+    domains = set()
+    for entry in WHITELISTED_URLS:
+        parsed = urlparse(entry["url"])
+        domains.add(parsed.netloc)
+    return domains
+
+def get_total_whitelisted_urls():
+    return len(WHITELISTED_URLS)
+
+def is_url_whitelisted(url: str) -> bool:
     try:
-        from url_whitelist_config import get_total_whitelisted_urls
-    except ImportError:
-        # If it's still not found, create an alias
-        get_total_whitelisted_urls = get_all_whitelisted_urls
-    
-    logger.info("✅ Successfully imported URL whitelist configuration")
-    
-except ImportError as e:
-    logger.error(f"❌ Failed to import url_whitelist_config: {e}")
-    logger.info("🔄 Using fallback whitelist configuration")
-    
-    # Fallback implementation
-    WHITELISTED_URLS = [
-        {"url": "https://www.epa.gov", "description": "EPA Regulations"},
-        {"url": "https://www.osha.gov", "description": "OSHA Standards"},
-        {"url": "https://www.fhwa.dot.gov", "description": "FHWA Standards"},
-        {"url": "https://www.awwa.org", "description": "Water Standards"},
-    ]
-    
-    URL_REGEX = re.compile(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+')
-    
-    def get_whitelisted_domains():
-        domains = set()
-        for entry in WHITELISTED_URLS:
-            parsed = urlparse(entry["url"])
-            domains.add(parsed.netloc)
-        return domains
-    
-    def get_all_whitelisted_urls():
-        return len(WHITELISTED_URLS)
-    
-    def get_total_whitelisted_urls():
-        return len(WHITELISTED_URLS)
-    
-    def is_url_whitelisted(url: str) -> bool:
-        try:
-            parsed = urlparse(url)
-            for whitelisted in WHITELISTED_URLS:
-                whitelisted_parsed = urlparse(whitelisted["url"])
-                if (parsed.netloc == whitelisted_parsed.netloc and 
-                    parsed.path.startswith(whitelisted_parsed.path)):
-                    return True
-        except Exception:
-            return False
+        parsed = urlparse(url)
+        for whitelisted in WHITELISTED_URLS:
+            whitelisted_parsed = urlparse(whitelisted["url"])
+            if (parsed.netloc == whitelisted_parsed.netloc and 
+                parsed.path.startswith(whitelisted_parsed.path)):
+                return True
+    except Exception:
         return False
+    return False
+
+logger.info("✅ Using temporary whitelist configuration - app should now start")
 
 # ============================================================================
 # CONFIGURATION: ENVIRONMENT VARIABLES AND CLIENTS
