@@ -20,6 +20,7 @@ import requests
 import logging
 import json
 from pathlib import Path
+import time
 
 # PDF extraction imports
 try:
@@ -89,12 +90,10 @@ def fetch_whitelist():
         response = requests.get(WHITELIST_URL, timeout=10)
         response.raise_for_status()
         data = response.json()
-        # Expecting list of dicts with "url" keys
         whitelist_urls = [entry["url"] for entry in data if "url" in entry]
         logger.info(f"Loaded {len(whitelist_urls)} URLs from external whitelist")
     except Exception as e:
         logger.warning(f"Failed to fetch external whitelist: {e}")
-        # Fallback to embedded whitelist URLs
         whitelist_urls = [entry["url"] for entry in EMBEDDED_WHITELIST]
         logger.info(f"Using embedded whitelist with {len(whitelist_urls)} URLs")
 
@@ -319,36 +318,46 @@ def extract_text_from_pdf(content: bytes) -> str:
         return f"[Error extracting PDF text: {str(e)}]"
 
 def generate_llm_response(query: str, context: str, system_prompt: str, has_document: bool) -> str:
-    """Generate LLM response using Anthropic"""
+    """Generate LLM response using Anthropic with retry logic"""
     global anthropic_client
     if not anthropic_client:
         return generate_mock_response(query, context, system_prompt, has_document)
     
-    try:
-        # Use Claude Sonnet 4.5 - latest and most capable model
-        message = anthropic_client.messages.create(
-            model="claude-sonnet-4-5-20250929",
-            max_tokens=4096,
-            system=system_prompt,
-            messages=[
-                {
-                    "role": "user", 
-                    "content": f"User query: {query}\n\nDocument context: {context[:8000] if context else 'No document uploaded'}"
-                }
-            ]
-        )
-
-        if message.content and len(message.content) > 0:
-            return message.content[0].text
-        else:
-            raise HTTPException(status_code=500, detail="Empty response from LLM")
+    max_retries = 3
+    retry_delay = 2
     
-    except APIError as e:
-        logger.error(f"Anthropic API Error: {e}")
-        raise HTTPException(status_code=500, detail=f"Anthropic API Error: {str(e)}")
-    except Exception as e:
-        logger.error(f"Error generating LLM response: {e}")
-        raise HTTPException(status_code=500, detail=f"Error generating LLM response: {str(e)}")
+    for attempt in range(max_retries):
+        try:
+            message = anthropic_client.messages.create(
+                model="claude-sonnet-4-5-20250929",
+                max_tokens=4096,
+                system=system_prompt,
+                messages=[
+                    {
+                        "role": "user", 
+                        "content": f"User query: {query}\n\nDocument context: {context[:8000] if context else 'No document uploaded'}"
+                    }
+                ],
+                timeout=60.0
+            )
+
+            if message.content and len(message.content) > 0:
+                return message.content[0].text
+            else:
+                raise HTTPException(status_code=500, detail="Empty response from LLM")
+        
+        except APIError as e:
+            logger.error(f"Anthropic API Error details: {type(e).__name__}: {str(e)}")
+            logger.error(f"Attempt {attempt + 1}/{max_retries} failed")
+            
+            if attempt < max_retries - 1:
+                time.sleep(retry_delay)
+                continue
+            raise HTTPException(status_code=500, detail=f"Anthropic API Error after {max_retries} attempts: {str(e)}")
+        
+        except Exception as e:
+            logger.error(f"Error generating LLM response: {e}")
+            raise HTTPException(status_code=500, detail=f"Error generating LLM response: {str(e)}")
 
 def generate_mock_response(query: str, context: str, system_prompt: str, has_document: bool) -> str:
     """Generate mock response for testing"""
@@ -989,14 +998,14 @@ async def startup_event():
                 test_message = anthropic_client.messages.create(
                     model="claude-sonnet-4-5-20250929",
                     max_tokens=10,
-                    messages=[{"role": "user", "content": "Hi"}]
+                    messages=[{"role": "user", "content": "Hi"}],
+                    timeout=30.0
                 )
                 logger.info("✅ Anthropic API connection verified")
                 logger.info(f"✅ Using model: claude-sonnet-4-5-20250929")
             except Exception as test_error:
                 logger.error(f"⚠️  Anthropic API test failed: {test_error}")
-                logger.warning("⚠️  Client initialized but API may not be accessible")
-                # Don't set to None - let it try during actual use
+                logger.warning("⚠️  Connection issues detected - will retry during actual use")
         except Exception as e:
             logger.error(f"❌ Anthropic client initialization failed: {e}")
             anthropic_client = None
