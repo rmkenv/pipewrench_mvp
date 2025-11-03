@@ -132,7 +132,7 @@
       <p>Preserving Institutional Knowledge in Public Works</p>
       <div class="statusbar">
         <span class="pill" id="status-api">API: checking…</span>
-        <span class="pill" id="status-anthropic">Anthropic: unset</span>
+        <span class="pill" id="status-anthropic">Anthropic: configured</span>
         <span class="pill" id="status-whitelist">Whitelist: …</span>
       </div>
     </header>
@@ -226,13 +226,6 @@
 
     <div id="settings" class="tab-content">
       <h2>Settings</h2>
-      <div class="form-group">
-        <label for="api-key">Anthropic API Key (optional)</label>
-        <input type="password" id="api-key" class="form-control" placeholder="sk-ant-…" />
-        <small class="note">Saved in your browser and used only for API calls.</small>
-      </div>
-      <button id="saveBtn" class="btn btn-primary">Save Settings</button>
-
       <div style="margin-top: 24px; padding: 16px; background: var(--bg-dark); border-radius: 8px; border-left: 4px solid var(--accent-orange);">
         <h4 style="color:var(--accent-orange); margin-bottom: 8px;">About PipeWrench AI</h4>
         <p class="note">
@@ -263,7 +256,6 @@
     const API = '';
 
     let sessionId = null;
-    let apiKey = null;
 
     // Tabs
     document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -280,7 +272,6 @@
     function setPill(id, text) { const el = document.getElementById(id); if (el) el.textContent = text; }
 
     window.addEventListener('load', async () => {
-      loadSettings();
       await bootstrap();
     });
 
@@ -418,20 +409,6 @@
       } catch (err) {
         showError('report-error', err.message);
       }
-    }
-
-    // Settings
-    document.getElementById('saveBtn').addEventListener('click', () => {
-      apiKey = document.getElementById('api-key').value.trim();
-      if (apiKey) { localStorage.setItem('anthropic_api_key', apiKey); setPill('status-anthropic', 'Anthropic: set'); alert('Saved'); }
-      else { localStorage.removeItem('anthropic_api_key'); setPill('status-anthropic', 'Anthropic: unset'); alert('Cleared'); }
-    });
-    function loadSettings() {
-      const saved = localStorage.getItem('anthropic_api_key');
-      if (saved) {
-        apiKey = saved; document.getElementById('api-key').value = saved;
-        setPill('status-anthropic', 'Anthropic: set');
-      } else setPill('status-anthropic', 'Anthropic: unset');
     }
 
     // Utilities
