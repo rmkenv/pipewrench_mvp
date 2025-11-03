@@ -128,8 +128,9 @@ def is_url_whitelisted(url: str) -> bool:
 # ====
 DRAWING_PROCESSING_API_URL = os.getenv("DRAWING_PROCESSING_API_URL", "http://localhost:8001/parse")
 
-anthropic_client = None  # Will be initialized in startup event
+# Initialize Anthropic client globally
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
+anthropic_client = Anthropic(api_key=ANTHROPIC_API_KEY) if ANTHROPIC_API_KEY else None
 
 # Session configuration
 SESSION_EXPIRY_HOURS = int(os.getenv("SESSION_EXPIRY_HOURS", "24"))
@@ -319,7 +320,6 @@ def extract_text_from_pdf(content: bytes) -> str:
 
 def generate_llm_response(query: str, context: str, system_prompt: str, has_document: bool) -> str:
     """Generate LLM response using Anthropic with retry logic"""
-    global anthropic_client
     if not anthropic_client:
         return generate_mock_response(query, context, system_prompt, has_document)
     
@@ -960,7 +960,6 @@ async def global_exception_handler(request: Request, exc: Exception):
 @app.on_event("startup")
 async def startup_event():
     """Initialize application on startup"""
-    global anthropic_client
     logger.info("=" * 70)
     logger.info("PipeWrench AI - Municipal DPW Knowledge Capture System")
     logger.info("=" * 70)
@@ -982,33 +981,26 @@ async def startup_event():
     logger.info(f"✅ Job Roles: {len(JOB_ROLES)}")
     logger.info(f"✅ Session Expiry: {SESSION_EXPIRY_HOURS} hours")
     
-    # Check for API key
-    if not ANTHROPIC_API_KEY:
+    # Check Anthropic client
+    if not anthropic_client:
         logger.warning("⚠️  ANTHROPIC_API_KEY not found in environment variables")
         logger.warning("⚠️  Application will run in DEMO MODE")
-        anthropic_client = None
     else:
+        logger.info("✅ Anthropic client initialized successfully")
+        
+        # Test the connection
         try:
-            # Initialize Anthropic client with explicit API key
-            anthropic_client = Anthropic(api_key=ANTHROPIC_API_KEY)
-            logger.info("✅ Anthropic client initialized successfully")
-            
-            # Test the connection with a simple call
-            try:
-                test_message = anthropic_client.messages.create(
-                    model="claude-sonnet-4-5-20250929",
-                    max_tokens=10,
-                    messages=[{"role": "user", "content": "Hi"}],
-                    timeout=30.0
-                )
-                logger.info("✅ Anthropic API connection verified")
-                logger.info(f"✅ Using model: claude-sonnet-4-5-20250929")
-            except Exception as test_error:
-                logger.error(f"⚠️  Anthropic API test failed: {test_error}")
-                logger.warning("⚠️  Connection issues detected - will retry during actual use")
-        except Exception as e:
-            logger.error(f"❌ Anthropic client initialization failed: {e}")
-            anthropic_client = None
+            test_message = anthropic_client.messages.create(
+                model="claude-sonnet-4-5-20250929",
+                max_tokens=10,
+                messages=[{"role": "user", "content": "Hi"}],
+                timeout=30.0
+            )
+            logger.info("✅ Anthropic API connection verified")
+            logger.info(f"✅ Using model: claude-sonnet-4-5-20250929")
+        except Exception as test_error:
+            logger.error(f"⚠️  Anthropic API test failed: {test_error}")
+            logger.warning("⚠️  Connection issues detected - will retry during actual use")
     
     logger.info("=" * 70)
     logger.info("🚀 Application startup complete")
