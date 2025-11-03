@@ -108,6 +108,7 @@ logger.info(f"✅ Whitelist configured with {get_total_whitelisted_urls()} URLs"
 DRAWING_PROCESSING_API_URL = os.getenv("DRAWING_PROCESSING_API_URL", "http://localhost:8001/parse")
 
 anthropic_client = None  # Will be initialized in startup event
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 
 # ====
 # CONFIGURATION: JOB ROLES
@@ -260,14 +261,15 @@ def generate_llm_response(query: str, context: str, system_prompt: str, has_docu
         return generate_mock_response(query, context, system_prompt, has_document)
     
     try:
+        # Use Claude 3.5 Sonnet - a current, widely available model
         message = anthropic_client.messages.create(
-            model="claude-1",  # Use a widely available model or your preferred one
-            max_tokens=2048,
+            model="claude-3-5-sonnet-20241022",
+            max_tokens=4096,
             system=system_prompt,
             messages=[
                 {
                     "role": "user", 
-                    "content": f"User query: {query}\n\nDocument context: {context[:4000] if context else 'No document uploaded'}"
+                    "content": f"User query: {query}\n\nDocument context: {context[:8000] if context else 'No document uploaded'}"
                 }
             ]
         )
@@ -422,7 +424,8 @@ async def health_check():
     return {
         "status": "healthy",
         "timestamp": datetime.now().isoformat(),
-        "anthropic_configured": anthropic_client is not None
+        "anthropic_configured": anthropic_client is not None,
+        "api_key_present": bool(ANTHROPIC_API_KEY)
     }
 
 # ====
@@ -461,7 +464,8 @@ async def system_info():
             departments=[d["value"] for d in get_department_list()],
             config={
                 "version": "1.0.0",
-                "anthropic_configured": anthropic_client is not None
+                "anthropic_configured": anthropic_client is not None,
+                "api_key_present": bool(ANTHROPIC_API_KEY)
             }
         )
     except Exception as e:
@@ -737,13 +741,31 @@ async def startup_event():
     logger.info(f"Departments: {len(DEPARTMENT_PROMPTS)}")
     logger.info(f"Job Roles: {len(JOB_ROLES)}")
     
-    try:
-        # Initialize Anthropic client without passing API key explicitly
-        anthropic_client = Anthropic()
-        logger.info("✅ Anthropic client initialized")
-    except Exception as e:
-        logger.error(f"❌ Anthropic client initialization failed: {e}")
+    # Check for API key
+    if not ANTHROPIC_API_KEY:
+        logger.warning("⚠️  ANTHROPIC_API_KEY not found in environment variables")
+        logger.warning("⚠️  Application will run in DEMO MODE")
         anthropic_client = None
+    else:
+        try:
+            # Initialize Anthropic client with explicit API key
+            anthropic_client = Anthropic(api_key=ANTHROPIC_API_KEY)
+            logger.info("✅ Anthropic client initialized successfully")
+            
+            # Test the connection with a simple call
+            try:
+                test_message = anthropic_client.messages.create(
+                    model="claude-3-5-sonnet-20241022",
+                    max_tokens=10,
+                    messages=[{"role": "user", "content": "Hi"}]
+                )
+                logger.info("✅ Anthropic API connection verified")
+            except Exception as test_error:
+                logger.error(f"⚠️  Anthropic API test failed: {test_error}")
+                logger.warning("⚠️  Client initialized but API may not be accessible")
+        except Exception as e:
+            logger.error(f"❌ Anthropic client initialization failed: {e}")
+            anthropic_client = None
     
     logger.info("=" * 70)
 
