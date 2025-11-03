@@ -1,9 +1,10 @@
 """
 PipeWrench AI - Municipal DPW Knowledge Capture System
 FastAPI application with integrated frontend UI
+Optimized for Render.com deployment
 """
 
-from fastapi import FastAPI, Form, UploadFile, File, HTTPException, Request
+from fastapi import FastAPI, Form, UploadFile, File, HTTPException, Request, Depends
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -20,7 +21,10 @@ import requests
 import logging
 import json
 from pathlib import Path
+from contextlib import asynccontextmanager
+import random
 import time
+import httpx
 
 # PDF extraction imports
 try:
@@ -34,34 +38,11 @@ except ImportError:
         PDF_EXTRACTION_AVAILABLE = False
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-app = FastAPI(title="PipeWrench AI", version="1.0.0")
-
-# Add CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
-
-# Mount static files and templates
-static_dir = Path("static")
-templates_dir = Path("templates")
-
-if static_dir.exists():
-    app.mount("/static", StaticFiles(directory="static"), name="static")
-else:
-    logger.warning("Static directory not found - static files will not be served")
-
-if templates_dir.exists():
-    templates = Jinja2Templates(directory="templates")
-else:
-    logger.warning("Templates directory not found - UI will use fallback HTML")
-    templates = None
+logger = logging.getLogger(__name__)
 
 # ====
 # URL WHITELIST CONFIGURATION
@@ -80,22 +61,22 @@ EMBEDDED_WHITELIST = [
     {"url": "https://www.asce.org", "description": "ASCE Standards"},
 ]
 
-whitelist_urls = []  # Will hold list of URL strings loaded from JSON
+whitelist_urls = []
 
 def fetch_whitelist():
     """Fetch whitelist from external URL or use embedded fallback"""
     global whitelist_urls
     try:
-        logger.info(f"Fetching whitelist from {WHITELIST_URL} ...")
-        response = requests.get(WHITELIST_URL, timeout=10)
+        logger.info(f"Fetching whitelist from {WHITELIST_URL}...")
+        response = requests.get(WHITELIST_URL, timeout=15)
         response.raise_for_status()
         data = response.json()
         whitelist_urls = [entry["url"] for entry in data if "url" in entry]
-        logger.info(f"Loaded {len(whitelist_urls)} URLs from external whitelist")
+        logger.info(f"✅ Loaded {len(whitelist_urls)} URLs from external whitelist")
     except Exception as e:
-        logger.warning(f"Failed to fetch external whitelist: {e}")
+        logger.warning(f"⚠️  Failed to fetch external whitelist: {e}")
         whitelist_urls = [entry["url"] for entry in EMBEDDED_WHITELIST]
-        logger.info(f"Using embedded whitelist with {len(whitelist_urls)} URLs")
+        logger.info(f"✅ Using embedded whitelist with {len(whitelist_urls)} URLs")
 
 def get_whitelisted_domains():
     """Get set of whitelisted domains"""
@@ -124,16 +105,169 @@ def is_url_whitelisted(url: str) -> bool:
     return False
 
 # ====
-# CONFIGURATION: ENVIRONMENT VARIABLES AND CLIENTS
+# CONFIGURATION: ENVIRONMENT VARIABLES
 # ====
 DRAWING_PROCESSING_API_URL = os.getenv("DRAWING_PROCESSING_API_URL", "http://localhost:8001/parse")
-
-# Initialize Anthropic client globally
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
-anthropic_client = Anthropic(api_key=ANTHROPIC_API_KEY) if ANTHROPIC_API_KEY else None
-
-# Session configuration
 SESSION_EXPIRY_HOURS = int(os.getenv("SESSION_EXPIRY_HOURS", "24"))
+
+# Render-specific configuration
+IS_RENDER = bool(os.getenv("RENDER"))
+ENVIRONMENT = os.getenv("ENVIRONMENT", "production" if IS_RENDER else "development")
+
+# ====
+# APPLICATION STATE CLASS
+# ====
+class AppState:
+    """Application state container"""
+    def __init__(self):
+        self.anthropic_client: Optional[Anthropic] = None
+        self.session_manager: Optional['SessionManager'] = None
+        self.http_client: Optional[httpx.Client] = None
+    
+app_state = AppState()
+
+# ====
+# LIFESPAN CONTEXT MANAGER (Render-Optimized)
+# ====
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan context manager - Render.com optimized"""
+    # STARTUP
+    logger.info("=" * 70)
+    logger.info("PipeWrench AI - Municipal DPW Knowledge Capture System")
+    logger.info(f"Environment: {ENVIRONMENT}")
+    logger.info(f"Running on Render: {IS_RENDER}")
+    logger.info("=" * 70)
+    
+    # Initialize session manager
+    app_state.session_manager = SessionManager()
+    logger.info("✅ Session manager initialized")
+    
+    # Check PDF extraction
+    if not PDF_EXTRACTION_AVAILABLE:
+        logger.warning("⚠️  PDF extraction library not available")
+        logger.warning("⚠️  Install pypdf: pip install pypdf")
+    else:
+        logger.info("✅ PDF extraction library available")
+    
+    # Fetch whitelist
+    fetch_whitelist()
+    logger.info(f"✅ Whitelisted URLs: {get_total_whitelisted_urls()}")
+    logger.info(f"✅ Whitelisted Domains: {len(get_whitelisted_domains())}")
+    
+    # Configuration info
+    logger.info(f"✅ Departments: {len(DEPARTMENT_PROMPTS)}")
+    logger.info(f"✅ Job Roles: {len(JOB_ROLES)}")
+    logger.info(f"✅ Session Expiry: {SESSION_EXPIRY_HOURS} hours")
+    
+    # Initialize HTTP client with Render-optimized settings
+    if ANTHROPIC_API_KEY:
+        try:
+            # Render-optimized HTTP client configuration
+            timeout_config = httpx.Timeout(
+                connect=60.0 if IS_RENDER else 30.0,    # Longer connect timeout for Render
+                read=180.0 if IS_RENDER else 90.0,      # Longer read timeout for Render
+                write=60.0 if IS_RENDER else 30.0,      # Longer write timeout for Render
+                pool=30.0 if IS_RENDER else 10.0        # Longer pool timeout for Render
+            )
+            
+            limits_config = httpx.Limits(
+                max_connections=50 if IS_RENDER else 100,           # Reduced for Render
+                max_keepalive_connections=10 if IS_RENDER else 20   # Reduced for Render
+            )
+            
+            app_state.http_client = httpx.Client(
+                timeout=timeout_config,
+                limits=limits_config,
+                http2=False,  # Disable HTTP/2 for Render compatibility
+                follow_redirects=True,
+                transport=httpx.HTTPTransport(retries=3)  # Built-in transport retries
+            )
+            
+            logger.info("✅ HTTP client initialized (Render-optimized)")
+            
+            # Initialize Anthropic client
+            app_state.anthropic_client = Anthropic(
+                api_key=ANTHROPIC_API_KEY,
+                http_client=app_state.http_client,
+                max_retries=5 if IS_RENDER else 3,
+                timeout=180.0 if IS_RENDER else 60.0
+            )
+            
+            logger.info("✅ Anthropic client initialized")
+            logger.info(f"   Timeout: {180.0 if IS_RENDER else 60.0}s")
+            logger.info(f"   Max retries: {5 if IS_RENDER else 3}")
+            
+            # Skip startup test on Render to avoid delays
+            if not IS_RENDER:
+                try:
+                    test_message = app_state.anthropic_client.messages.create(
+                        model="claude-sonnet-4-20241022",
+                        max_tokens=5,
+                        messages=[{"role": "user", "content": "hi"}],
+                        timeout=10.0
+                    )
+                    logger.info("✅ Anthropic API connection verified")
+                except Exception as test_error:
+                    logger.warning(f"⚠️  Startup test skipped or failed: {type(test_error).__name__}")
+            else:
+                logger.info("ℹ️  Skipping startup API test on Render (will test on first request)")
+                
+        except Exception as e:
+            logger.error(f"❌ Anthropic client initialization failed: {e}")
+            app_state.anthropic_client = None
+    else:
+        logger.warning("⚠️  ANTHROPIC_API_KEY not found - running in DEMO MODE")
+        app_state.anthropic_client = None
+    
+    logger.info("=" * 70)
+    logger.info("🚀 Application startup complete")
+    logger.info("=" * 70)
+    
+    yield  # Application runs here
+    
+    # SHUTDOWN
+    logger.info("Application shutting down...")
+    if app_state.session_manager:
+        logger.info(f"Active sessions at shutdown: {app_state.session_manager.get_session_count()}")
+    
+    # Close HTTP client
+    if app_state.http_client:
+        app_state.http_client.close()
+        logger.info("✅ HTTP client closed")
+
+# ====
+# CREATE FASTAPI APP WITH LIFESPAN
+# ====
+app = FastAPI(
+    title="PipeWrench AI",
+    version="1.0.0",
+    lifespan=lifespan,
+    docs_url="/docs" if not IS_RENDER else None,  # Disable docs in production
+    redoc_url="/redoc" if not IS_RENDER else None
+)
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Mount static files and templates
+static_dir = Path("static")
+templates_dir = Path("templates")
+
+if static_dir.exists():
+    app.mount("/static", StaticFiles(directory="static"), name="static")
+
+if templates_dir.exists():
+    templates = Jinja2Templates(directory="templates")
+else:
+    templates = None
 
 # ====
 # CONFIGURATION: JOB ROLES
@@ -210,6 +344,19 @@ You help with budgeting, project planning, and departmental management."""
 }
 
 # ====
+# DEPENDENCY: GET CLIENTS
+# ====
+def get_anthropic_client() -> Optional[Anthropic]:
+    """Dependency to get Anthropic client"""
+    return app_state.anthropic_client
+
+def get_session_manager() -> 'SessionManager':
+    """Dependency to get session manager"""
+    if app_state.session_manager is None:
+        raise HTTPException(status_code=500, detail="Session manager not initialized")
+    return app_state.session_manager
+
+# ====
 # HELPER FUNCTIONS
 # ====
 def get_role_list():
@@ -271,11 +418,11 @@ def build_system_prompt(department_key: str, role_key: Optional[str]) -> str:
 def extract_text_from_pdf(content: bytes) -> str:
     """Extract text from PDF content with multiple fallback methods"""
     if not PDF_EXTRACTION_AVAILABLE:
-        logger.error("No PDF extraction library available. Install pypdf or PyPDF2.")
+        logger.error("No PDF extraction library available")
         return "[ERROR: PDF extraction library not installed. Install pypdf or PyPDF2.]"
     
     try:
-        # Try pypdf first (recommended)
+        # Try pypdf first
         try:
             import pypdf
             pdf_reader = pypdf.PdfReader(io.BytesIO(content))
@@ -290,7 +437,7 @@ def extract_text_from_pdf(content: bytes) -> str:
                     text += f"\n--- Page {page_num + 1} ---\n[Error extracting this page]\n"
             
             if text.strip():
-                logger.info(f"Successfully extracted {len(text)} characters from PDF using pypdf")
+                logger.info(f"Extracted {len(text)} characters from PDF using pypdf")
                 return text
             else:
                 return "[PDF appears to be empty or contains only images]"
@@ -309,7 +456,7 @@ def extract_text_from_pdf(content: bytes) -> str:
                     text += f"\n--- Page {page_num + 1} ---\n[Error extracting this page]\n"
             
             if text.strip():
-                logger.info(f"Successfully extracted {len(text)} characters from PDF using PyPDF2")
+                logger.info(f"Extracted {len(text)} characters from PDF using PyPDF2")
                 return text
             else:
                 return "[PDF appears to be empty or contains only images]"
@@ -318,18 +465,41 @@ def extract_text_from_pdf(content: bytes) -> str:
         logger.error(f"Error extracting PDF text: {e}", exc_info=True)
         return f"[Error extracting PDF text: {str(e)}]"
 
-def generate_llm_response(query: str, context: str, system_prompt: str, has_document: bool) -> str:
-    """Generate LLM response using Anthropic with retry logic"""
+def generate_llm_response(
+    query: str, 
+    context: str, 
+    system_prompt: str, 
+    has_document: bool,
+    anthropic_client: Optional[Anthropic]
+) -> str:
+    """
+    Generate LLM response using Anthropic - Render.com optimized
+    
+    Args:
+        query: User's question
+        context: Document context (if any)
+        system_prompt: System prompt with role/department context
+        has_document: Whether a document was uploaded
+        anthropic_client: Anthropic client instance
+    
+    Returns:
+        Generated response text
+    
+    Raises:
+        HTTPException: On API errors or timeouts
+    """
     if not anthropic_client:
         return generate_mock_response(query, context, system_prompt, has_document)
     
-    max_retries = 3
-    retry_delay = 2
+    max_retries = 5 if IS_RENDER else 3
+    base_delay = 3 if IS_RENDER else 2
     
     for attempt in range(max_retries):
         try:
+            logger.info(f"Anthropic API call attempt {attempt + 1}/{max_retries}")
+            
             message = anthropic_client.messages.create(
-                model="claude-sonnet-4-5-20250929",
+                model="claude-sonnet-4-20241022",
                 max_tokens=4096,
                 system=system_prompt,
                 messages=[
@@ -338,26 +508,78 @@ def generate_llm_response(query: str, context: str, system_prompt: str, has_docu
                         "content": f"User query: {query}\n\nDocument context: {context[:8000] if context else 'No document uploaded'}"
                     }
                 ],
-                timeout=60.0
+                timeout=180.0 if IS_RENDER else 60.0
             )
 
             if message.content and len(message.content) > 0:
+                logger.info(f"✅ Anthropic API call successful on attempt {attempt + 1}")
                 return message.content[0].text
             else:
                 raise HTTPException(status_code=500, detail="Empty response from LLM")
         
         except APIError as e:
-            logger.error(f"Anthropic API Error details: {type(e).__name__}: {str(e)}")
-            logger.error(f"Attempt {attempt + 1}/{max_retries} failed")
+            error_str = str(e).lower()
+            error_type = type(e).__name__
             
-            if attempt < max_retries - 1:
-                time.sleep(retry_delay)
-                continue
-            raise HTTPException(status_code=500, detail=f"Anthropic API Error after {max_retries} attempts: {str(e)}")
+            logger.error(f"Anthropic API Error on attempt {attempt + 1}/{max_retries}")
+            logger.error(f"  Error type: {error_type}")
+            logger.error(f"  Error message: {str(e)[:200]}")
+            
+            # Categorize errors
+            is_timeout = "timeout" in error_str or "timed out" in error_str
+            is_connection = "connection" in error_str or "network" in error_str
+            is_rate_limit = "rate" in error_str or "429" in error_str
+            is_server_error = any(code in error_str for code in ["500", "502", "503", "504"])
+            
+            # Determine if retryable
+            should_retry = (is_timeout or is_connection or is_rate_limit or is_server_error)
+            
+            if not should_retry or attempt >= max_retries - 1:
+                logger.error(f"❌ Not retrying - final attempt or non-retryable error")
+                raise HTTPException(
+                    status_code=503,
+                    detail=f"API temporarily unavailable: {error_type}. Please try again in a moment."
+                )
+            
+            # Calculate backoff delay
+            delay = base_delay * (2 ** attempt)
+            
+            # Adjust delay based on error type
+            if is_rate_limit:
+                delay = delay * 3
+                logger.warning(f"  Rate limit detected - extended backoff")
+            elif is_timeout or is_connection:
+                delay = delay * 2
+                logger.warning(f"  Network issue detected - extended backoff")
+            
+            # Add jitter
+            jitter = random.uniform(delay * 0.1, delay * 0.2)
+            total_delay = delay + jitter
+            
+            logger.info(f"  Retrying in {total_delay:.1f} seconds... (Reason: {error_type})")
+            time.sleep(total_delay)
+            continue
         
         except Exception as e:
-            logger.error(f"Error generating LLM response: {e}")
-            raise HTTPException(status_code=500, detail=f"Error generating LLM response: {str(e)}")
+            logger.error(f"Unexpected error on attempt {attempt + 1}/{max_retries}: {e}", exc_info=True)
+            
+            # Only retry first unexpected error
+            if attempt == 0:
+                logger.info("  Retrying once for unexpected error...")
+                time.sleep(3)
+                continue
+            
+            raise HTTPException(
+                status_code=500, 
+                detail=f"Unexpected error: {type(e).__name__}"
+            )
+    
+    # Max retries exhausted
+    logger.error(f"❌ Max retries ({max_retries}) exhausted")
+    raise HTTPException(
+        status_code=503,
+        detail=f"Service temporarily unavailable after {max_retries} attempts. This may be due to network issues on Render. Please try again in a moment."
+    )
 
 def generate_mock_response(query: str, context: str, system_prompt: str, has_document: bool) -> str:
     """Generate mock response for testing"""
@@ -366,15 +588,16 @@ def generate_mock_response(query: str, context: str, system_prompt: str, has_doc
 Your question: {query}
 
 This is a demonstration response. To get real AI-powered answers:
-1. Set the ANTHROPIC_API_KEY environment variable
-2. Restart the application
+1. Set the ANTHROPIC_API_KEY environment variable in Render Dashboard
+2. Redeploy the application
 
-The system is configured with {get_total_whitelisted_urls()} whitelisted sources and will only cite approved URLs when operational.
+The system is configured with {get_total_whitelisted_urls()} whitelisted sources.
 
 Document uploaded: {'Yes' if has_document else 'No'}
 Document preview: {context[:200] if context else 'No document content'}...
 
-Department context configured: Yes
+Environment: {ENVIRONMENT}
+Running on Render: {IS_RENDER}
 PDF Extraction Available: {PDF_EXTRACTION_AVAILABLE}"""
 
 def enforce_whitelist_on_text(text: str) -> str:
@@ -430,7 +653,6 @@ class SessionManager:
         
         for session_id in expired:
             del self.sessions[session_id]
-            logger.info(f"Cleaned up expired session: {session_id}")
         
         if expired:
             logger.info(f"Cleaned up {len(expired)} expired sessions")
@@ -459,8 +681,6 @@ class SessionManager:
         """Get count of active sessions"""
         self.cleanup_expired_sessions()
         return len(self.sessions)
-
-session_manager = SessionManager()
 
 # ====
 # PYDANTIC MODELS
@@ -539,10 +759,8 @@ async def ui(request: Request):
             <div class="status error">
                 <strong>⚠️ UI Template Not Found</strong>
                 <p>The frontend template (templates/index.html) is missing.</p>
-                <p>API endpoints are still available:</p>
+                <p>API endpoints are available:</p>
                 <ul>
-                    <li><a href="/docs">API Documentation (Swagger UI)</a></li>
-                    <li><a href="/redoc">API Documentation (ReDoc)</a></li>
                     <li><a href="/healthz">Health Check</a></li>
                     <li><a href="/api/system">System Information</a></li>
                 </ul>
@@ -553,15 +771,20 @@ async def ui(request: Request):
     """)
 
 @app.get("/healthz")
-async def health_check():
-    """Health check endpoint for deployment platforms"""
+async def health_check(
+    client: Optional[Anthropic] = Depends(get_anthropic_client),
+    session_mgr: SessionManager = Depends(get_session_manager)
+):
+    """Health check endpoint for Render"""
     return {
         "status": "healthy",
         "timestamp": datetime.now().isoformat(),
-        "anthropic_configured": anthropic_client is not None,
+        "environment": ENVIRONMENT,
+        "is_render": IS_RENDER,
+        "anthropic_configured": client is not None,
         "api_key_present": bool(ANTHROPIC_API_KEY),
         "pdf_extraction_available": PDF_EXTRACTION_AVAILABLE,
-        "active_sessions": session_manager.get_session_count(),
+        "active_sessions": session_mgr.get_session_count(),
         "whitelisted_urls": get_total_whitelisted_urls()
     }
 
@@ -570,7 +793,7 @@ async def health_check():
 # ====
 @app.get("/api/departments")
 async def get_departments():
-    """Get list of all available departments."""
+    """Get list of all available departments"""
     try:
         return {"departments": get_department_list()}
     except Exception as e:
@@ -579,7 +802,7 @@ async def get_departments():
 
 @app.get("/api/roles")
 async def list_roles():
-    """Get list of all available job roles."""
+    """Get list of all available job roles"""
     try:
         roles = []
         for key in get_all_roles():
@@ -592,8 +815,11 @@ async def list_roles():
         raise HTTPException(status_code=500, detail="Failed to retrieve roles")
 
 @app.get("/api/system")
-async def system_info():
-    """Get system configuration information."""
+async def system_info(
+    client: Optional[Anthropic] = Depends(get_anthropic_client),
+    session_mgr: SessionManager = Depends(get_session_manager)
+):
+    """Get system configuration information"""
     try:
         return SystemInfoResponse(
             total_whitelisted_urls=get_total_whitelisted_urls(),
@@ -602,11 +828,15 @@ async def system_info():
             departments=[d["value"] for d in get_department_list()],
             config={
                 "version": "1.0.0",
-                "anthropic_configured": anthropic_client is not None,
+                "environment": ENVIRONMENT,
+                "is_render": IS_RENDER,
+                "anthropic_configured": client is not None,
                 "api_key_present": bool(ANTHROPIC_API_KEY),
                 "pdf_extraction_available": PDF_EXTRACTION_AVAILABLE,
                 "session_expiry_hours": SESSION_EXPIRY_HOURS,
-                "active_sessions": session_manager.get_session_count()
+                "active_sessions": session_mgr.get_session_count(),
+                "max_retries": 5 if IS_RENDER else 3,
+                "timeout_seconds": 180 if IS_RENDER else 60
             }
         )
     except Exception as e:
@@ -614,7 +844,11 @@ async def system_info():
         raise HTTPException(status_code=500, detail="Failed to retrieve system information")
 
 @app.post("/query")
-async def query_documents(request: QueryRequest):
+async def query_documents(
+    request: QueryRequest,
+    client: Optional[Anthropic] = Depends(get_anthropic_client),
+    session_mgr: SessionManager = Depends(get_session_manager)
+):
     """Query with or without uploaded documents"""
     
     # Get document context if session exists
@@ -622,7 +856,7 @@ async def query_documents(request: QueryRequest):
     has_document = False
     
     if request.session_id:
-        session = session_manager.get_session(request.session_id)
+        session = session_mgr.get_session(request.session_id)
         if session:
             document_text = session.get("text", "")
             has_document = bool(document_text)
@@ -639,7 +873,8 @@ async def query_documents(request: QueryRequest):
             request.query, 
             document_text, 
             system_prompt, 
-            has_document
+            has_document,
+            client
         )
         
         # Enforce whitelist compliance
@@ -647,7 +882,7 @@ async def query_documents(request: QueryRequest):
         
         # Update session with question
         if request.session_id:
-            session = session_manager.get_session(request.session_id)
+            session = session_mgr.get_session(request.session_id)
             if session:
                 if "questions" not in session:
                     session["questions"] = []
@@ -679,7 +914,8 @@ async def api_upload_document(
     session_id: str = Form(...),
     department: str = Form("general_public_works"),
     role: Optional[str] = Form(None),
-    api_key: Optional[str] = Form(None)
+    api_key: Optional[str] = Form(None),
+    session_mgr: SessionManager = Depends(get_session_manager)
 ):
     """API endpoint for document upload"""
     logger.info(f"Document upload - File: {file.filename}, Session: {session_id}")
@@ -694,23 +930,23 @@ async def api_upload_document(
         )
     
     # Validate session exists or create
-    session = session_manager.get_session(session_id)
+    session = session_mgr.get_session(session_id)
     if session is None:
-        session_manager.create_session(session_id, {})
+        session_mgr.create_session(session_id, {})
     
     try:
         # Process upload
         content = await file.read()
         
         # Validate file size (max 10MB)
-        max_size = 10 * 1024 * 1024  # 10MB
+        max_size = 10 * 1024 * 1024
         if len(content) > max_size:
             raise HTTPException(status_code=400, detail="File too large. Maximum size is 10MB.")
         
         # Extract text from PDF
         text = extract_text_from_pdf(content)
         
-        # Estimate page count from content
+        # Get page count
         try:
             import pypdf
             pdf_reader = pypdf.PdfReader(io.BytesIO(content))
@@ -724,7 +960,7 @@ async def api_upload_document(
                 page_count = max(1, len(content) // 2500)
         
         # Update session
-        session_manager.update_session(session_id, {
+        session_mgr.update_session(session_id, {
             "filename": file.filename,
             "text": text,
             "uploaded_at": datetime.now().isoformat(),
@@ -734,7 +970,7 @@ async def api_upload_document(
             "page_count": page_count
         })
         
-        logger.info(f"Successfully uploaded {file.filename} ({page_count} pages, {len(text)} chars extracted)")
+        logger.info(f"Successfully uploaded {file.filename} ({page_count} pages)")
         
         return {
             "session_id": session_id,
@@ -751,16 +987,18 @@ async def api_upload_document(
         raise HTTPException(status_code=500, detail=f"Failed to upload document: {str(e)}")
 
 @app.post("/api/report/generate")
-async def generate_report(session_id: str = Form(...)):
-    """Generate HTML report for a session."""
+async def generate_report(
+    session_id: str = Form(...),
+    session_mgr: SessionManager = Depends(get_session_manager)
+):
+    """Generate HTML report for a session"""
     logger.info(f"Generating report for session: {session_id}")
     
-    session = session_manager.get_session(session_id)
+    session = session_mgr.get_session(session_id)
     if session is None:
         raise HTTPException(status_code=404, detail="Session not found or expired")
     
     try:
-        # Build HTML report
         html_report = f"""
 <!DOCTYPE html>
 <html>
@@ -885,21 +1123,18 @@ async def generate_report(session_id: str = Form(...)):
     
     except Exception as e:
         logger.error(f"Failed to generate report: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=500,
-            detail="Failed to generate report. Please try again."
-        )
+        raise HTTPException(status_code=500, detail="Failed to generate report")
 
 # ====
 # UTILITY ENDPOINTS
 # ====
 @app.get("/api/sessions/cleanup")
-async def cleanup_sessions():
-    """Manually trigger session cleanup (admin endpoint)"""
+async def cleanup_sessions(session_mgr: SessionManager = Depends(get_session_manager)):
+    """Manually trigger session cleanup"""
     try:
-        before_count = session_manager.get_session_count()
-        session_manager.cleanup_expired_sessions()
-        after_count = session_manager.get_session_count()
+        before_count = session_mgr.get_session_count()
+        session_mgr.cleanup_expired_sessions()
+        after_count = session_mgr.get_session_count()
         
         return {
             "status": "success",
@@ -918,7 +1153,7 @@ async def get_whitelist_info():
         return {
             "total_urls": get_total_whitelisted_urls(),
             "domains": sorted(list(get_whitelisted_domains())),
-            "urls": whitelist_urls[:50]  # Return first 50 URLs
+            "urls": whitelist_urls[:50]
         }
     except Exception as e:
         logger.error(f"Error getting whitelist info: {e}")
@@ -945,7 +1180,7 @@ async def refresh_whitelist():
 # Global exception handler
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    """Global exception handler for unhandled errors."""
+    """Global exception handler for unhandled errors"""
     logger.error(f"Unhandled exception: {exc}", exc_info=True)
     return JSONResponse(
         status_code=500,
@@ -956,64 +1191,19 @@ async def global_exception_handler(request: Request, exc: Exception):
         }
     )
 
-# Startup event
-@app.on_event("startup")
-async def startup_event():
-    """Initialize application on startup"""
-    logger.info("=" * 70)
-    logger.info("PipeWrench AI - Municipal DPW Knowledge Capture System")
-    logger.info("=" * 70)
-    
-    # Check PDF extraction
-    if not PDF_EXTRACTION_AVAILABLE:
-        logger.warning("⚠️  PDF extraction library not available")
-        logger.warning("⚠️  Install pypdf or PyPDF2: pip install pypdf")
-    else:
-        logger.info("✅ PDF extraction library available")
-    
-    # Fetch whitelist
-    fetch_whitelist()
-    logger.info(f"✅ Whitelisted URLs: {get_total_whitelisted_urls()}")
-    logger.info(f"✅ Whitelisted Domains: {len(get_whitelisted_domains())}")
-    
-    # Configuration info
-    logger.info(f"✅ Departments: {len(DEPARTMENT_PROMPTS)}")
-    logger.info(f"✅ Job Roles: {len(JOB_ROLES)}")
-    logger.info(f"✅ Session Expiry: {SESSION_EXPIRY_HOURS} hours")
-    
-    # Check Anthropic client
-    if not anthropic_client:
-        logger.warning("⚠️  ANTHROPIC_API_KEY not found in environment variables")
-        logger.warning("⚠️  Application will run in DEMO MODE")
-    else:
-        logger.info("✅ Anthropic client initialized successfully")
-        
-        # Test the connection
-        try:
-            test_message = anthropic_client.messages.create(
-                model="claude-sonnet-4-5-20250929",
-                max_tokens=10,
-                messages=[{"role": "user", "content": "Hi"}],
-                timeout=30.0
-            )
-            logger.info("✅ Anthropic API connection verified")
-            logger.info(f"✅ Using model: claude-sonnet-4-5-20250929")
-        except Exception as test_error:
-            logger.error(f"⚠️  Anthropic API test failed: {test_error}")
-            logger.warning("⚠️  Connection issues detected - will retry during actual use")
-    
-    logger.info("=" * 70)
-    logger.info("🚀 Application startup complete")
-    logger.info("=" * 70)
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Cleanup on application shutdown"""
-    logger.info("Application shutting down...")
-    logger.info(f"Active sessions at shutdown: {session_manager.get_session_count()}")
-
+# ====
+# MAIN ENTRY POINT
+# ====
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
     logger.info(f"Starting server on port {port}")
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    uvicorn.run(
+        app, 
+        host="0.0.0.0", 
+        port=port,
+        timeout_keep_alive=120,
+        timeout_graceful_shutdown=30,
+        limit_max_requests=1000,
+        backlog=2048
+    )
