@@ -261,9 +261,9 @@ def generate_llm_response(query: str, context: str, system_prompt: str, has_docu
         return generate_mock_response(query, context, system_prompt, has_document)
     
     try:
-        # Use Claude 3.5 Sonnet - a current, widely available model
+        # Use Claude 3.5 Sonnet (June 2024 version - stable and widely available)
         message = anthropic_client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-3-5-sonnet-20240620",
             max_tokens=4096,
             system=system_prompt,
             messages=[
@@ -755,7 +755,7 @@ async def startup_event():
             # Test the connection with a simple call
             try:
                 test_message = anthropic_client.messages.create(
-                    model="claude-3-5-sonnet-20241022",
+                    model="claude-3-5-sonnet-20240620",
                     max_tokens=10,
                     messages=[{"role": "user", "content": "Hi"}]
                 )
