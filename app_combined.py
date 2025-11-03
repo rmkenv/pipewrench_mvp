@@ -1,7 +1,7 @@
 """
 PipeWrench AI - Municipal DPW Knowledge Capture System
 FastAPI application with integrated frontend UI
-Optimized for Render.com deployment
+Optimized for Render.com deployment with SSL/connection diagnostics
 """
 
 from fastapi import FastAPI, Form, UploadFile, File, HTTPException, Request, Depends
@@ -25,6 +25,9 @@ from contextlib import asynccontextmanager
 import random
 import time
 import httpx
+import certifi
+import ssl
+import socket
 
 # PDF extraction imports
 try:
@@ -51,7 +54,6 @@ logger = logging.getLogger(__name__)
 WHITELIST_URL = "https://raw.githubusercontent.com/rmkenv/pipewrench_mvp/main/custom_whitelist.json"
 URL_REGEX = re.compile(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+')
 
-# Default embedded whitelist as fallback
 EMBEDDED_WHITELIST = [
     {"url": "https://www.epa.gov", "description": "EPA Regulations"},
     {"url": "https://www.osha.gov", "description": "OSHA Standards"},
@@ -110,6 +112,7 @@ def is_url_whitelisted(url: str) -> bool:
 DRAWING_PROCESSING_API_URL = os.getenv("DRAWING_PROCESSING_API_URL", "http://localhost:8001/parse")
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 SESSION_EXPIRY_HOURS = int(os.getenv("SESSION_EXPIRY_HOURS", "24"))
+DEBUG_MODE = os.getenv("DEBUG_MODE", "false").lower() == "true"
 
 # Render-specific configuration
 IS_RENDER = bool(os.getenv("RENDER"))
@@ -128,16 +131,17 @@ class AppState:
 app_state = AppState()
 
 # ====
-# LIFESPAN CONTEXT MANAGER (Render-Optimized)
+# LIFESPAN CONTEXT MANAGER (Render-Optimized with SSL Fix)
 # ====
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Lifespan context manager - Render.com optimized"""
+    """Lifespan context manager - Render.com optimized with SSL diagnostics"""
     # STARTUP
     logger.info("=" * 70)
     logger.info("PipeWrench AI - Municipal DPW Knowledge Capture System")
     logger.info(f"Environment: {ENVIRONMENT}")
     logger.info(f"Running on Render: {IS_RENDER}")
+    logger.info(f"Debug Mode: {DEBUG_MODE}")
     logger.info("=" * 70)
     
     # Initialize session manager
@@ -161,61 +165,99 @@ async def lifespan(app: FastAPI):
     logger.info(f"✅ Job Roles: {len(JOB_ROLES)}")
     logger.info(f"✅ Session Expiry: {SESSION_EXPIRY_HOURS} hours")
     
-    # Initialize HTTP client with Render-optimized settings
+    # Check SSL certificates
+    try:
+        cert_path = certifi.where()
+        logger.info(f"✅ SSL Certificates: {cert_path}")
+    except Exception as e:
+        logger.warning(f"⚠️  SSL certificate check failed: {e}")
+    
+    # Test DNS resolution
+    try:
+        ip = socket.gethostbyname("api.anthropic.com")
+        logger.info(f"✅ DNS Resolution: api.anthropic.com -> {ip}")
+    except Exception as e:
+        logger.error(f"❌ DNS Resolution failed: {e}")
+    
+    # Initialize HTTP client with SSL fix
     if ANTHROPIC_API_KEY:
         try:
-            # Render-optimized HTTP client configuration
+            # Render-optimized timeout configuration
             timeout_config = httpx.Timeout(
-                connect=60.0 if IS_RENDER else 30.0,    # Longer connect timeout for Render
-                read=180.0 if IS_RENDER else 90.0,      # Longer read timeout for Render
-                write=60.0 if IS_RENDER else 30.0,      # Longer write timeout for Render
-                pool=30.0 if IS_RENDER else 10.0        # Longer pool timeout for Render
+                connect=90.0,     # Increased for Render
+                read=240.0,       # Increased for Render
+                write=90.0,       # Increased for Render
+                pool=60.0         # Increased for Render
             )
             
+            # Connection limits optimized for Render
             limits_config = httpx.Limits(
-                max_connections=50 if IS_RENDER else 100,           # Reduced for Render
-                max_keepalive_connections=10 if IS_RENDER else 20   # Reduced for Render
+                max_connections=50,
+                max_keepalive_connections=10,
+                keepalive_expiry=30.0
             )
             
-            app_state.http_client = httpx.Client(
-                timeout=timeout_config,
-                limits=limits_config,
-                http2=False,  # Disable HTTP/2 for Render compatibility
-                follow_redirects=True,
-                transport=httpx.HTTPTransport(retries=3)  # Built-in transport retries
-            )
-            
-            logger.info("✅ HTTP client initialized (Render-optimized)")
+            # Try with SSL verification first
+            try:
+                app_state.http_client = httpx.Client(
+                    timeout=timeout_config,
+                    limits=limits_config,
+                    verify=certifi.where(),  # Use certifi certificates
+                    http2=False,
+                    follow_redirects=True,
+                    transport=httpx.HTTPTransport(
+                        retries=5,
+                        verify=certifi.where()
+                    )
+                )
+                logger.info(f"✅ HTTP client initialized with SSL verification")
+                logger.info(f"   Using certificates from: {certifi.where()}")
+            except Exception as ssl_error:
+                logger.warning(f"⚠️  SSL verification failed: {ssl_error}")
+                logger.warning(f"⚠️  Attempting without SSL verification (debug only)...")
+                
+                # Fallback without SSL verification (only for debugging)
+                app_state.http_client = httpx.Client(
+                    timeout=timeout_config,
+                    limits=limits_config,
+                    verify=False,  # Disable SSL verification as fallback
+                    http2=False,
+                    follow_redirects=True
+                )
+                logger.warning("⚠️  HTTP client running WITHOUT SSL verification")
             
             # Initialize Anthropic client
             app_state.anthropic_client = Anthropic(
                 api_key=ANTHROPIC_API_KEY,
                 http_client=app_state.http_client,
-                max_retries=5 if IS_RENDER else 3,
-                timeout=180.0 if IS_RENDER else 60.0
+                max_retries=5,
+                timeout=240.0  # 4 minutes for Render
             )
             
             logger.info("✅ Anthropic client initialized")
-            logger.info(f"   Timeout: {180.0 if IS_RENDER else 60.0}s")
-            logger.info(f"   Max retries: {5 if IS_RENDER else 3}")
+            logger.info(f"   Timeout: 240s")
+            logger.info(f"   Max retries: 5")
             
-            # Skip startup test on Render to avoid delays
-            if not IS_RENDER:
+            # Skip startup test on Render for faster deployment
+            if not IS_RENDER or DEBUG_MODE:
                 try:
+                    logger.info("Testing Anthropic API connection...")
                     test_message = app_state.anthropic_client.messages.create(
                         model="claude-sonnet-4-20241022",
                         max_tokens=5,
-                        messages=[{"role": "user", "content": "hi"}],
-                        timeout=10.0
+                        messages=[{"role": "user", "content": "test"}],
+                        timeout=30.0
                     )
-                    logger.info("✅ Anthropic API connection verified")
+                    logger.info("✅ Anthropic API connection verified!")
                 except Exception as test_error:
-                    logger.warning(f"⚠️  Startup test skipped or failed: {type(test_error).__name__}")
+                    logger.warning(f"⚠️  Startup API test failed: {type(test_error).__name__}")
+                    logger.warning(f"⚠️  Error: {str(test_error)[:200]}")
+                    logger.info("ℹ️  Will retry on first actual request")
             else:
-                logger.info("ℹ️  Skipping startup API test on Render (will test on first request)")
+                logger.info("ℹ️  Skipping startup API test (will test on first request)")
                 
         except Exception as e:
-            logger.error(f"❌ Anthropic client initialization failed: {e}")
+            logger.error(f"❌ Anthropic client initialization failed: {e}", exc_info=True)
             app_state.anthropic_client = None
     else:
         logger.warning("⚠️  ANTHROPIC_API_KEY not found - running in DEMO MODE")
@@ -244,8 +286,8 @@ app = FastAPI(
     title="PipeWrench AI",
     version="1.0.0",
     lifespan=lifespan,
-    docs_url="/docs" if not IS_RENDER else None,  # Disable docs in production
-    redoc_url="/redoc" if not IS_RENDER else None
+    docs_url="/docs" if DEBUG_MODE else None,
+    redoc_url="/redoc" if DEBUG_MODE else None
 )
 
 # Add CORS middleware
@@ -422,7 +464,6 @@ def extract_text_from_pdf(content: bytes) -> str:
         return "[ERROR: PDF extraction library not installed. Install pypdf or PyPDF2.]"
     
     try:
-        # Try pypdf first
         try:
             import pypdf
             pdf_reader = pypdf.PdfReader(io.BytesIO(content))
@@ -442,7 +483,6 @@ def extract_text_from_pdf(content: bytes) -> str:
             else:
                 return "[PDF appears to be empty or contains only images]"
         except (ImportError, AttributeError):
-            # Fall back to PyPDF2
             from PyPDF2 import PdfReader as PyPDF2Reader
             pdf_reader = PyPDF2Reader(io.BytesIO(content))
             text = ""
@@ -473,30 +513,17 @@ def generate_llm_response(
     anthropic_client: Optional[Anthropic]
 ) -> str:
     """
-    Generate LLM response using Anthropic - Render.com optimized
-    
-    Args:
-        query: User's question
-        context: Document context (if any)
-        system_prompt: System prompt with role/department context
-        has_document: Whether a document was uploaded
-        anthropic_client: Anthropic client instance
-    
-    Returns:
-        Generated response text
-    
-    Raises:
-        HTTPException: On API errors or timeouts
+    Generate LLM response using Anthropic - Render.com optimized with enhanced error handling
     """
     if not anthropic_client:
         return generate_mock_response(query, context, system_prompt, has_document)
     
-    max_retries = 5 if IS_RENDER else 3
-    base_delay = 3 if IS_RENDER else 2
+    max_retries = 5
+    base_delay = 5  # Increased base delay for Render
     
     for attempt in range(max_retries):
         try:
-            logger.info(f"Anthropic API call attempt {attempt + 1}/{max_retries}")
+            logger.info(f"🔄 Anthropic API call attempt {attempt + 1}/{max_retries}")
             
             message = anthropic_client.messages.create(
                 model="claude-sonnet-4-20241022",
@@ -508,7 +535,7 @@ def generate_llm_response(
                         "content": f"User query: {query}\n\nDocument context: {context[:8000] if context else 'No document uploaded'}"
                     }
                 ],
-                timeout=180.0 if IS_RENDER else 60.0
+                timeout=240.0  # 4 minutes for Render
             )
 
             if message.content and len(message.content) > 0:
@@ -521,13 +548,19 @@ def generate_llm_response(
             error_str = str(e).lower()
             error_type = type(e).__name__
             
-            logger.error(f"Anthropic API Error on attempt {attempt + 1}/{max_retries}")
-            logger.error(f"  Error type: {error_type}")
-            logger.error(f"  Error message: {str(e)[:200]}")
+            logger.error(f"❌ Anthropic API Error on attempt {attempt + 1}/{max_retries}")
+            logger.error(f"   Error type: {error_type}")
+            logger.error(f"   Error message: {str(e)[:300]}")
+            
+            # Log full error details for debugging
+            if DEBUG_MODE:
+                logger.error(f"   Full error: {str(e)}")
+                if hasattr(e, 'response'):
+                    logger.error(f"   Response: {e.response}")
             
             # Categorize errors
             is_timeout = "timeout" in error_str or "timed out" in error_str
-            is_connection = "connection" in error_str or "network" in error_str
+            is_connection = "connection" in error_str or "network" in error_str or "connect" in error_str
             is_rate_limit = "rate" in error_str or "429" in error_str
             is_server_error = any(code in error_str for code in ["500", "502", "503", "504"])
             
@@ -536,10 +569,18 @@ def generate_llm_response(
             
             if not should_retry or attempt >= max_retries - 1:
                 logger.error(f"❌ Not retrying - final attempt or non-retryable error")
-                raise HTTPException(
-                    status_code=503,
-                    detail=f"API temporarily unavailable: {error_type}. Please try again in a moment."
-                )
+                
+                # Provide helpful error message
+                if is_connection:
+                    detail = "Cannot connect to Anthropic API. This may be a network configuration issue. Please check Render logs and contact support if this persists."
+                elif is_timeout:
+                    detail = "API request timed out. The service may be experiencing high load. Please try again."
+                elif is_rate_limit:
+                    detail = "Rate limit exceeded. Please wait a moment and try again."
+                else:
+                    detail = f"API error: {error_type}. Please try again or contact support."
+                
+                raise HTTPException(status_code=503, detail=detail)
             
             # Calculate backoff delay
             delay = base_delay * (2 ** attempt)
@@ -547,38 +588,38 @@ def generate_llm_response(
             # Adjust delay based on error type
             if is_rate_limit:
                 delay = delay * 3
-                logger.warning(f"  Rate limit detected - extended backoff")
+                logger.warning(f"   ⏸️  Rate limit detected - extended backoff")
             elif is_timeout or is_connection:
                 delay = delay * 2
-                logger.warning(f"  Network issue detected - extended backoff")
+                logger.warning(f"   ⏸️  Network issue detected - extended backoff")
             
             # Add jitter
-            jitter = random.uniform(delay * 0.1, delay * 0.2)
+            jitter = random.uniform(delay * 0.1, delay * 0.3)
             total_delay = delay + jitter
             
-            logger.info(f"  Retrying in {total_delay:.1f} seconds... (Reason: {error_type})")
+            logger.info(f"   ⏳ Retrying in {total_delay:.1f} seconds... (Reason: {error_type})")
             time.sleep(total_delay)
             continue
         
         except Exception as e:
-            logger.error(f"Unexpected error on attempt {attempt + 1}/{max_retries}: {e}", exc_info=True)
+            logger.error(f"❌ Unexpected error on attempt {attempt + 1}/{max_retries}: {e}", exc_info=True)
             
             # Only retry first unexpected error
             if attempt == 0:
-                logger.info("  Retrying once for unexpected error...")
-                time.sleep(3)
+                logger.info("   🔄 Retrying once for unexpected error...")
+                time.sleep(5)
                 continue
             
             raise HTTPException(
                 status_code=500, 
-                detail=f"Unexpected error: {type(e).__name__}"
+                detail=f"Unexpected error: {type(e).__name__}. Please try again."
             )
     
     # Max retries exhausted
     logger.error(f"❌ Max retries ({max_retries}) exhausted")
     raise HTTPException(
         status_code=503,
-        detail=f"Service temporarily unavailable after {max_retries} attempts. This may be due to network issues on Render. Please try again in a moment."
+        detail="Service temporarily unavailable after multiple attempts. This may indicate a persistent network issue on Render. Please try again later or contact support."
     )
 
 def generate_mock_response(query: str, context: str, system_prompt: str, has_document: bool) -> str:
@@ -598,6 +639,7 @@ Document preview: {context[:200] if context else 'No document content'}...
 
 Environment: {ENVIRONMENT}
 Running on Render: {IS_RENDER}
+Debug Mode: {DEBUG_MODE}
 PDF Extraction Available: {PDF_EXTRACTION_AVAILABLE}"""
 
 def enforce_whitelist_on_text(text: str) -> str:
@@ -706,6 +748,100 @@ class SystemInfoResponse(BaseModel):
     config: Dict
 
 # ====
+# DIAGNOSTIC ENDPOINT
+# ====
+@app.get("/api/test-connection")
+async def test_connection():
+    """Diagnostic endpoint to test various connections"""
+    results = {}
+    
+    # Test 1: Basic DNS resolution
+    try:
+        ip = socket.gethostbyname("api.anthropic.com")
+        results["dns_resolution"] = f"✅ Success: {ip}"
+    except Exception as e:
+        results["dns_resolution"] = f"❌ Failed: {str(e)}"
+    
+    # Test 2: Basic HTTP connection with requests
+    try:
+        resp = requests.get("https://api.anthropic.com", timeout=10)
+        results["http_connection_requests"] = f"✅ Status: {resp.status_code}"
+    except Exception as e:
+        results["http_connection_requests"] = f"❌ Failed: {str(e)}"
+    
+    # Test 3: HTTPX with SSL verification
+    try:
+        with httpx.Client(timeout=10.0, verify=True) as client:
+            resp = client.get("https://api.anthropic.com")
+            results["httpx_verified"] = f"✅ Status: {resp.status_code}"
+    except Exception as e:
+        results["httpx_verified"] = f"❌ Failed: {str(e)[:200]}"
+    
+    # Test 4: HTTPX without SSL verification
+    try:
+        with httpx.Client(timeout=10.0, verify=False) as client:
+            resp = client.get("https://api.anthropic.com")
+            results["httpx_unverified"] = f"✅ Status: {resp.status_code}"
+    except Exception as e:
+        results["httpx_unverified"] = f"❌ Failed: {str(e)[:200]}"
+    
+    # Test 5: Check certificates
+    try:
+        cert_path = certifi.where()
+        results["certifi_path"] = cert_path
+        results["certifi_available"] = "✅ Available"
+    except Exception as e:
+        results["certifi_available"] = f"❌ Failed: {str(e)}"
+    
+    # Test 6: Anthropic client initialization
+    try:
+        if ANTHROPIC_API_KEY:
+            test_client = Anthropic(api_key=ANTHROPIC_API_KEY, timeout=10.0)
+            results["anthropic_init"] = "✅ Client created"
+            
+            # Try a simple API call
+            try:
+                msg = test_client.messages.create(
+                    model="claude-sonnet-4-20241022",
+                    max_tokens=5,
+                    messages=[{"role": "user", "content": "hi"}],
+                    timeout=30.0
+                )
+                results["anthropic_api_call"] = "✅ API call successful"
+            except Exception as api_e:
+                results["anthropic_api_call"] = f"❌ API call failed: {str(api_e)[:200]}"
+        else:
+            results["anthropic_init"] = "❌ No API key"
+    except Exception as e:
+        results["anthropic_init"] = f"❌ Failed: {str(e)[:200]}"
+    
+    # Test 7: Check current HTTP client
+    if app_state.http_client:
+        results["app_http_client"] = "✅ Initialized"
+    else:
+        results["app_http_client"] = "❌ Not initialized"
+    
+    # Test 8: Check current Anthropic client
+    if app_state.anthropic_client:
+        results["app_anthropic_client"] = "✅ Initialized"
+    else:
+        results["app_anthropic_client"] = "❌ Not initialized"
+    
+    return {
+        "timestamp": datetime.now().isoformat(),
+        "environment": ENVIRONMENT,
+        "is_render": IS_RENDER,
+        "debug_mode": DEBUG_MODE,
+        "diagnostics": results,
+        "recommendations": [
+            "If DNS fails: Check Render network configuration",
+            "If HTTPX verified fails but unverified works: SSL certificate issue",
+            "If all HTTP tests fail: Render may be blocking outbound connections",
+            "If only Anthropic API call fails: Check API key validity"
+        ]
+    }
+
+# ====
 # FRONTEND ROUTES
 # ====
 @app.get("/", response_class=HTMLResponse)
@@ -763,6 +899,7 @@ async def ui(request: Request):
                 <ul>
                     <li><a href="/healthz">Health Check</a></li>
                     <li><a href="/api/system">System Information</a></li>
+                    <li><a href="/api/test-connection">🔍 Connection Diagnostics</a></li>
                 </ul>
             </div>
         </div>
@@ -781,11 +918,13 @@ async def health_check(
         "timestamp": datetime.now().isoformat(),
         "environment": ENVIRONMENT,
         "is_render": IS_RENDER,
+        "debug_mode": DEBUG_MODE,
         "anthropic_configured": client is not None,
         "api_key_present": bool(ANTHROPIC_API_KEY),
         "pdf_extraction_available": PDF_EXTRACTION_AVAILABLE,
         "active_sessions": session_mgr.get_session_count(),
-        "whitelisted_urls": get_total_whitelisted_urls()
+        "whitelisted_urls": get_total_whitelisted_urls(),
+        "ssl_certificates": certifi.where() if certifi else "Not available"
     }
 
 # ====
@@ -830,13 +969,15 @@ async def system_info(
                 "version": "1.0.0",
                 "environment": ENVIRONMENT,
                 "is_render": IS_RENDER,
+                "debug_mode": DEBUG_MODE,
                 "anthropic_configured": client is not None,
                 "api_key_present": bool(ANTHROPIC_API_KEY),
                 "pdf_extraction_available": PDF_EXTRACTION_AVAILABLE,
                 "session_expiry_hours": SESSION_EXPIRY_HOURS,
                 "active_sessions": session_mgr.get_session_count(),
-                "max_retries": 5 if IS_RENDER else 3,
-                "timeout_seconds": 180 if IS_RENDER else 60
+                "max_retries": 5,
+                "timeout_seconds": 240,
+                "ssl_certificates": certifi.where() if certifi else "Not available"
             }
         )
     except Exception as e:
@@ -1187,7 +1328,8 @@ async def global_exception_handler(request: Request, exc: Exception):
         content={
             "error": "Internal Server Error", 
             "detail": "An unexpected error occurred. Please try again later.",
-            "path": str(request.url)
+            "path": str(request.url),
+            "hint": "Check /api/test-connection for diagnostics"
         }
     )
 
