@@ -261,7 +261,7 @@ def generate_llm_response(query: str, context: str, system_prompt: str, has_docu
     
     try:
         message = anthropic_client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-1",  # Use a widely available model or your preferred one
             max_tokens=2048,
             system=system_prompt,
             messages=[
@@ -737,16 +737,13 @@ async def startup_event():
     logger.info(f"Departments: {len(DEPARTMENT_PROMPTS)}")
     logger.info(f"Job Roles: {len(JOB_ROLES)}")
     
-    api_key = os.getenv("ANTHROPIC_API_KEY")
-    if api_key:
-        try:
-            anthropic_client = Anthropic(api_key=api_key)
-            logger.info("✅ Anthropic client initialized")
-        except Exception as e:
-            logger.error(f"❌ Anthropic client initialization failed: {e}")
-            anthropic_client = None
-    else:
-        logger.warning("⚠️ Anthropic API key not set - using mock responses")
+    try:
+        # Initialize Anthropic client without passing API key explicitly
+        anthropic_client = Anthropic()
+        logger.info("✅ Anthropic client initialized")
+    except Exception as e:
+        logger.error(f"❌ Anthropic client initialization failed: {e}")
+        anthropic_client = None
     
     logger.info("=" * 70)
 
