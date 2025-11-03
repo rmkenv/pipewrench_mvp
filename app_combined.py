@@ -106,17 +106,8 @@ logger.info(f"✅ Whitelist configured with {get_total_whitelisted_urls()} URLs"
 # CONFIGURATION: ENVIRONMENT VARIABLES AND CLIENTS
 # ====
 DRAWING_PROCESSING_API_URL = os.getenv("DRAWING_PROCESSING_API_URL", "http://localhost:8001/parse")
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 
-try:
-    anthropic_client = Anthropic(api_key=ANTHROPIC_API_KEY) if ANTHROPIC_API_KEY else None
-    if anthropic_client:
-        logger.info("✅ Anthropic client initialized")
-    else:
-        logger.warning("⚠️ Anthropic API key not set - using mock responses")
-except Exception as e:
-    logger.error(f"❌ Anthropic client initialization failed: {e}")
-    anthropic_client = None
+anthropic_client = None  # Will be initialized in startup event
 
 # ====
 # CONFIGURATION: JOB ROLES
@@ -264,6 +255,7 @@ def extract_text_from_pdf(content: bytes) -> str:
 
 def generate_llm_response(query: str, context: str, system_prompt: str, has_document: bool) -> str:
     """Generate LLM response using Anthropic"""
+    global anthropic_client
     if not anthropic_client:
         return generate_mock_response(query, context, system_prompt, has_document)
     
@@ -736,6 +728,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 # Startup event
 @app.on_event("startup")
 async def startup_event():
+    global anthropic_client
     logger.info("=" * 70)
     logger.info("PipeWrench AI - Municipal DPW Knowledge Capture System")
     logger.info("=" * 70)
@@ -743,7 +736,18 @@ async def startup_event():
     logger.info(f"Whitelisted URLs: {get_total_whitelisted_urls()}")
     logger.info(f"Departments: {len(DEPARTMENT_PROMPTS)}")
     logger.info(f"Job Roles: {len(JOB_ROLES)}")
-    logger.info(f"Anthropic API: {'✅ Configured' if anthropic_client else '⚠️ Not configured (demo mode)'}")
+    
+    api_key = os.getenv("ANTHROPIC_API_KEY")
+    if api_key:
+        try:
+            anthropic_client = Anthropic(api_key=api_key)
+            logger.info("✅ Anthropic client initialized")
+        except Exception as e:
+            logger.error(f"❌ Anthropic client initialization failed: {e}")
+            anthropic_client = None
+    else:
+        logger.warning("⚠️ Anthropic API key not set - using mock responses")
+    
     logger.info("=" * 70)
 
 if __name__ == "__main__":
