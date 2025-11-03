@@ -261,7 +261,7 @@ def generate_llm_response(query: str, context: str, system_prompt: str, has_docu
     
     try:
         message = anthropic_client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-2",  # Updated to a valid model name
             max_tokens=2048,
             system=system_prompt,
             messages=[
