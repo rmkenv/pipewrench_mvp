@@ -1,7 +1,24 @@
-fastapi==0.115.0
-uvicorn[standard]==0.30.6
-pydantic==2.9.2
-requests==2.32.3
-anthropic
-python-multipart>=0.0.9
-jinja2
+# FastAPI and server
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+
+# Templates and static files
+jinja2==3.1.2
+
+# Anthropic AI
+anthropic==0.7.8
+
+# PDF processing (use one of these)
+pypdf==3.17.1
+# OR if pypdf doesn't work:
+# PyPDF2==3.0.1
+
+# HTTP requests
+requests==2.31.0
+
+# Data validation
+pydantic==2.5.0
+
+# ASGI server
+python-dotenv==1.0.0
