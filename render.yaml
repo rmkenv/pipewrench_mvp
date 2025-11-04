@@ -4,20 +4,43 @@ services:
     env: python
     plan: free
     region: oregon
+    # Use the latest Python 3.12 (or 3.11/3.10) for Render compatibility
+    pythonVersion: 3.12.0 
+    
+    # Ensure all dependencies, including the RAG components, are installed
     buildCommand: pip install --upgrade pip && pip install -r requirements.txt
+    
+    # The start command is correct for running the combined FastAPI app
     startCommand: uvicorn app_combined:app --host 0.0.0.0 --port $PORT
+    
     autoDeploy: true
-    healthCheckPath: /healthz
+    
+    # Using the diagnostic endpoint for a more robust health check
+    healthCheckPath: /api/test-connection 
+    
     envVars:
-      - key: OPENAI_API_KEY
-        sync: false
-      - key: OPENAI_MODEL
-        value: gpt-4o-mini
+      # --- CRITICAL CHANGE: Replaced OPENAI with GEMINI ---
+      - key: GEMINI_API_KEY
+        # IMPORTANT: This must be set securely on Render's dashboard.
+        # Set 'sync: false' means it won't sync from a shared group.
+        # Consider making it a Secret File or Group for better management.
+        sync: false 
+      
+      # Use the correct model variable name as defined in the Python code
+      - key: GEMINI_MODEL
+        value: gemini-2.5-flash
+        
+      # --- Optional Tweaks ---
       - key: DRAWING_PROCESSING_API_URL
-        value: http://localhost:8001/parse
+        # ALERT: This should point to a real service URL, not localhost
+        value: http://localhost:8001/parse 
+      
+      # The pythonVersion field above handles this now, but keeping for environment reference
       - key: PYTHON_VERSION
-        value: 3.11.9
+        value: 3.12.0
+        
       - key: ENVIRONMENT
         value: production
+        
       - key: SESSION_EXPIRY_HOURS
         value: 24
