@@ -2,6 +2,7 @@
 PipeWrench AI - Municipal DPW Knowledge Capture System
 FastAPI application with integrated frontend UI
 Optimized for Render.com deployment with SSL/connection diagnostics
+Converted to use OpenAI API
 """
 
 from fastapi import FastAPI, Form, UploadFile, File, HTTPException, Request, Depends
@@ -10,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
-from anthropic import Anthropic, APIError
+from openai import OpenAI, OpenAIError
 import os
 from datetime import datetime, timedelta
 from typing import Optional, Dict, List
@@ -110,7 +111,7 @@ def is_url_whitelisted(url: str) -> bool:
 # CONFIGURATION: ENVIRONMENT VARIABLES
 # ====
 DRAWING_PROCESSING_API_URL = os.getenv("DRAWING_PROCESSING_API_URL", "http://localhost:8001/parse")
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 SESSION_EXPIRY_HOURS = int(os.getenv("SESSION_EXPIRY_HOURS", "24"))
 DEBUG_MODE = os.getenv("DEBUG_MODE", "false").lower() == "true"
 
@@ -118,13 +119,16 @@ DEBUG_MODE = os.getenv("DEBUG_MODE", "false").lower() == "true"
 IS_RENDER = bool(os.getenv("RENDER"))
 ENVIRONMENT = os.getenv("ENVIRONMENT", "production" if IS_RENDER else "development")
 
+# OpenAI model configuration
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4-turbo-preview")  # or "gpt-4", "gpt-3.5-turbo"
+
 # ====
 # APPLICATION STATE CLASS
 # ====
 class AppState:
     """Application state container"""
     def __init__(self):
-        self.anthropic_client: Optional[Anthropic] = None
+        self.openai_client: Optional[OpenAI] = None
         self.session_manager: Optional['SessionManager'] = None
         self.http_client: Optional[httpx.Client] = None
     
@@ -174,13 +178,13 @@ async def lifespan(app: FastAPI):
     
     # Test DNS resolution
     try:
-        ip = socket.gethostbyname("api.anthropic.com")
-        logger.info(f"✅ DNS Resolution: api.anthropic.com -> {ip}")
+        ip = socket.gethostbyname("api.openai.com")
+        logger.info(f"✅ DNS Resolution: api.openai.com -> {ip}")
     except Exception as e:
         logger.error(f"❌ DNS Resolution failed: {e}")
     
     # Initialize HTTP client with SSL fix
-    if ANTHROPIC_API_KEY:
+    if OPENAI_API_KEY:
         try:
             # Render-optimized timeout configuration
             timeout_config = httpx.Timeout(
@@ -226,29 +230,30 @@ async def lifespan(app: FastAPI):
                 )
                 logger.warning("⚠️  HTTP client running WITHOUT SSL verification")
             
-            # Initialize Anthropic client
-            app_state.anthropic_client = Anthropic(
-                api_key=ANTHROPIC_API_KEY,
+            # Initialize OpenAI client
+            app_state.openai_client = OpenAI(
+                api_key=OPENAI_API_KEY,
                 http_client=app_state.http_client,
                 max_retries=5,
                 timeout=240.0  # 4 minutes for Render
             )
             
-            logger.info("✅ Anthropic client initialized")
+            logger.info("✅ OpenAI client initialized")
+            logger.info(f"   Model: {OPENAI_MODEL}")
             logger.info(f"   Timeout: 240s")
             logger.info(f"   Max retries: 5")
             
             # Skip startup test on Render for faster deployment
             if not IS_RENDER or DEBUG_MODE:
                 try:
-                    logger.info("Testing Anthropic API connection...")
-                    test_message = app_state.anthropic_client.messages.create(
-                        model="claude-sonnet-4-20241022",
-                        max_tokens=5,
+                    logger.info("Testing OpenAI API connection...")
+                    test_response = app_state.openai_client.chat.completions.create(
+                        model=OPENAI_MODEL,
                         messages=[{"role": "user", "content": "test"}],
+                        max_tokens=5,
                         timeout=30.0
                     )
-                    logger.info("✅ Anthropic API connection verified!")
+                    logger.info("✅ OpenAI API connection verified!")
                 except Exception as test_error:
                     logger.warning(f"⚠️  Startup API test failed: {type(test_error).__name__}")
                     logger.warning(f"⚠️  Error: {str(test_error)[:200]}")
@@ -257,11 +262,11 @@ async def lifespan(app: FastAPI):
                 logger.info("ℹ️  Skipping startup API test (will test on first request)")
                 
         except Exception as e:
-            logger.error(f"❌ Anthropic client initialization failed: {e}", exc_info=True)
-            app_state.anthropic_client = None
+            logger.error(f"❌ OpenAI client initialization failed: {e}", exc_info=True)
+            app_state.openai_client = None
     else:
-        logger.warning("⚠️  ANTHROPIC_API_KEY not found - running in DEMO MODE")
-        app_state.anthropic_client = None
+        logger.warning("⚠️  OPENAI_API_KEY not found - running in DEMO MODE")
+        app_state.openai_client = None
     
     logger.info("=" * 70)
     logger.info("🚀 Application startup complete")
@@ -388,9 +393,9 @@ You help with budgeting, project planning, and departmental management."""
 # ====
 # DEPENDENCY: GET CLIENTS
 # ====
-def get_anthropic_client() -> Optional[Anthropic]:
-    """Dependency to get Anthropic client"""
-    return app_state.anthropic_client
+def get_openai_client() -> Optional[OpenAI]:
+    """Dependency to get OpenAI client"""
+    return app_state.openai_client
 
 def get_session_manager() -> 'SessionManager':
     """Dependency to get session manager"""
@@ -510,12 +515,12 @@ def generate_llm_response(
     context: str, 
     system_prompt: str, 
     has_document: bool,
-    anthropic_client: Optional[Anthropic]
+    openai_client: Optional[OpenAI]
 ) -> str:
     """
-    Generate LLM response using Anthropic - Render.com optimized with enhanced error handling
+    Generate LLM response using OpenAI - Render.com optimized with enhanced error handling
     """
-    if not anthropic_client:
+    if not openai_client:
         return generate_mock_response(query, context, system_prompt, has_document)
     
     max_retries = 5
@@ -523,32 +528,35 @@ def generate_llm_response(
     
     for attempt in range(max_retries):
         try:
-            logger.info(f"🔄 Anthropic API call attempt {attempt + 1}/{max_retries}")
+            logger.info(f"🔄 OpenAI API call attempt {attempt + 1}/{max_retries}")
             
-            message = anthropic_client.messages.create(
-                model="claude-sonnet-4-20241022",
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {
+                    "role": "user", 
+                    "content": f"User query: {query}\n\nDocument context: {context[:8000] if context else 'No document uploaded'}"
+                }
+            ]
+            
+            response = openai_client.chat.completions.create(
+                model=OPENAI_MODEL,
+                messages=messages,
                 max_tokens=4096,
-                system=system_prompt,
-                messages=[
-                    {
-                        "role": "user", 
-                        "content": f"User query: {query}\n\nDocument context: {context[:8000] if context else 'No document uploaded'}"
-                    }
-                ],
+                temperature=0.7,
                 timeout=240.0  # 4 minutes for Render
             )
-
-            if message.content and len(message.content) > 0:
-                logger.info(f"✅ Anthropic API call successful on attempt {attempt + 1}")
-                return message.content[0].text
+            
+            if response.choices and len(response.choices) > 0:
+                logger.info(f"✅ OpenAI API call successful on attempt {attempt + 1}")
+                return response.choices[0].message.content
             else:
                 raise HTTPException(status_code=500, detail="Empty response from LLM")
         
-        except APIError as e:
+        except OpenAIError as e:
             error_str = str(e).lower()
             error_type = type(e).__name__
             
-            logger.error(f"❌ Anthropic API Error on attempt {attempt + 1}/{max_retries}")
+            logger.error(f"❌ OpenAI API Error on attempt {attempt + 1}/{max_retries}")
             logger.error(f"   Error type: {error_type}")
             logger.error(f"   Error message: {str(e)[:300]}")
             
@@ -572,7 +580,7 @@ def generate_llm_response(
                 
                 # Provide helpful error message
                 if is_connection:
-                    detail = "Cannot connect to Anthropic API. This may be a network configuration issue. Please check Render logs and contact support if this persists."
+                    detail = "Cannot connect to OpenAI API. This may be a network configuration issue. Please check Render logs and contact support if this persists."
                 elif is_timeout:
                     detail = "API request timed out. The service may be experiencing high load. Please try again."
                 elif is_rate_limit:
@@ -624,12 +632,12 @@ def generate_llm_response(
 
 def generate_mock_response(query: str, context: str, system_prompt: str, has_document: bool) -> str:
     """Generate mock response for testing"""
-    return f"""[DEMO MODE - Anthropic API key not configured]
+    return f"""[DEMO MODE - OpenAI API key not configured]
 
 Your question: {query}
 
 This is a demonstration response. To get real AI-powered answers:
-1. Set the ANTHROPIC_API_KEY environment variable in Render Dashboard
+1. Set the OPENAI_API_KEY environment variable in Render Dashboard
 2. Redeploy the application
 
 The system is configured with {get_total_whitelisted_urls()} whitelisted sources.
@@ -757,14 +765,14 @@ async def test_connection():
     
     # Test 1: Basic DNS resolution
     try:
-        ip = socket.gethostbyname("api.anthropic.com")
+        ip = socket.gethostbyname("api.openai.com")
         results["dns_resolution"] = f"✅ Success: {ip}"
     except Exception as e:
         results["dns_resolution"] = f"❌ Failed: {str(e)}"
     
     # Test 2: Basic HTTP connection with requests
     try:
-        resp = requests.get("https://api.anthropic.com", timeout=10)
+        resp = requests.get("https://api.openai.com", timeout=10)
         results["http_connection_requests"] = f"✅ Status: {resp.status_code}"
     except Exception as e:
         results["http_connection_requests"] = f"❌ Failed: {str(e)}"
@@ -772,7 +780,7 @@ async def test_connection():
     # Test 3: HTTPX with SSL verification
     try:
         with httpx.Client(timeout=10.0, verify=True) as client:
-            resp = client.get("https://api.anthropic.com")
+            resp = client.get("https://api.openai.com")
             results["httpx_verified"] = f"✅ Status: {resp.status_code}"
     except Exception as e:
         results["httpx_verified"] = f"❌ Failed: {str(e)[:200]}"
@@ -780,7 +788,7 @@ async def test_connection():
     # Test 4: HTTPX without SSL verification
     try:
         with httpx.Client(timeout=10.0, verify=False) as client:
-            resp = client.get("https://api.anthropic.com")
+            resp = client.get("https://api.openai.com")
             results["httpx_unverified"] = f"✅ Status: {resp.status_code}"
     except Exception as e:
         results["httpx_unverified"] = f"❌ Failed: {str(e)[:200]}"
@@ -793,27 +801,26 @@ async def test_connection():
     except Exception as e:
         results["certifi_available"] = f"❌ Failed: {str(e)}"
     
-    # Test 6: Anthropic client initialization
+    # Test 6: OpenAI client initialization
     try:
-        if ANTHROPIC_API_KEY:
-            test_client = Anthropic(api_key=ANTHROPIC_API_KEY, timeout=10.0)
-            results["anthropic_init"] = "✅ Client created"
+        if OPENAI_API_KEY:
+            test_client = OpenAI(api_key=OPENAI_API_KEY, timeout=10.0)
+            results["openai_init"] = "✅ Client created"
             
             # Try a simple API call
             try:
-                msg = test_client.messages.create(
-                    model="claude-sonnet-4-20241022",
-                    max_tokens=5,
+                response = test_client.chat.completions.create(
+                    model="gpt-3.5-turbo",
                     messages=[{"role": "user", "content": "hi"}],
-                    timeout=30.0
+                    max_tokens=5
                 )
-                results["anthropic_api_call"] = "✅ API call successful"
+                results["openai_api_call"] = "✅ API call successful"
             except Exception as api_e:
-                results["anthropic_api_call"] = f"❌ API call failed: {str(api_e)[:200]}"
+                results["openai_api_call"] = f"❌ API call failed: {str(api_e)[:200]}"
         else:
-            results["anthropic_init"] = "❌ No API key"
+            results["openai_init"] = "❌ No API key"
     except Exception as e:
-        results["anthropic_init"] = f"❌ Failed: {str(e)[:200]}"
+        results["openai_init"] = f"❌ Failed: {str(e)[:200]}"
     
     # Test 7: Check current HTTP client
     if app_state.http_client:
@@ -821,11 +828,11 @@ async def test_connection():
     else:
         results["app_http_client"] = "❌ Not initialized"
     
-    # Test 8: Check current Anthropic client
-    if app_state.anthropic_client:
-        results["app_anthropic_client"] = "✅ Initialized"
+    # Test 8: Check current OpenAI client
+    if app_state.openai_client:
+        results["app_openai_client"] = "✅ Initialized"
     else:
-        results["app_anthropic_client"] = "❌ Not initialized"
+        results["app_openai_client"] = "❌ Not initialized"
     
     return {
         "timestamp": datetime.now().isoformat(),
@@ -837,7 +844,7 @@ async def test_connection():
             "If DNS fails: Check Render network configuration",
             "If HTTPX verified fails but unverified works: SSL certificate issue",
             "If all HTTP tests fail: Render may be blocking outbound connections",
-            "If only Anthropic API call fails: Check API key validity"
+            "If only OpenAI API call fails: Check API key validity"
         ]
     }
 
@@ -909,7 +916,7 @@ async def ui(request: Request):
 
 @app.get("/healthz")
 async def health_check(
-    client: Optional[Anthropic] = Depends(get_anthropic_client),
+    client: Optional[OpenAI] = Depends(get_openai_client),
     session_mgr: SessionManager = Depends(get_session_manager)
 ):
     """Health check endpoint for Render"""
@@ -919,8 +926,9 @@ async def health_check(
         "environment": ENVIRONMENT,
         "is_render": IS_RENDER,
         "debug_mode": DEBUG_MODE,
-        "anthropic_configured": client is not None,
-        "api_key_present": bool(ANTHROPIC_API_KEY),
+        "openai_configured": client is not None,
+        "api_key_present": bool(OPENAI_API_KEY),
+        "model": OPENAI_MODEL,
         "pdf_extraction_available": PDF_EXTRACTION_AVAILABLE,
         "active_sessions": session_mgr.get_session_count(),
         "whitelisted_urls": get_total_whitelisted_urls(),
@@ -955,7 +963,7 @@ async def list_roles():
 
 @app.get("/api/system")
 async def system_info(
-    client: Optional[Anthropic] = Depends(get_anthropic_client),
+    client: Optional[OpenAI] = Depends(get_openai_client),
     session_mgr: SessionManager = Depends(get_session_manager)
 ):
     """Get system configuration information"""
@@ -970,8 +978,9 @@ async def system_info(
                 "environment": ENVIRONMENT,
                 "is_render": IS_RENDER,
                 "debug_mode": DEBUG_MODE,
-                "anthropic_configured": client is not None,
-                "api_key_present": bool(ANTHROPIC_API_KEY),
+                "openai_configured": client is not None,
+                "api_key_present": bool(OPENAI_API_KEY),
+                "model": OPENAI_MODEL,
                 "pdf_extraction_available": PDF_EXTRACTION_AVAILABLE,
                 "session_expiry_hours": SESSION_EXPIRY_HOURS,
                 "active_sessions": session_mgr.get_session_count(),
@@ -987,7 +996,7 @@ async def system_info(
 @app.post("/query")
 async def query_documents(
     request: QueryRequest,
-    client: Optional[Anthropic] = Depends(get_anthropic_client),
+    client: Optional[OpenAI] = Depends(get_openai_client),
     session_mgr: SessionManager = Depends(get_session_manager)
 ):
     """Query with or without uploaded documents"""
