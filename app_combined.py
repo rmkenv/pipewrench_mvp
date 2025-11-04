@@ -120,7 +120,8 @@ IS_RENDER = bool(os.getenv("RENDER"))
 ENVIRONMENT = os.getenv("ENVIRONMENT", "production" if IS_RENDER else "development")
 
 # OpenAI model configuration
-OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4-turbo-preview")  # or "gpt-4", "gpt-3.5-turbo"
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+
 
 # ====
 # APPLICATION STATE CLASS
