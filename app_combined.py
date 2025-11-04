@@ -531,9 +531,20 @@ def generate_llm_response(
         detail="Service temporarily unavailable after multiple attempts."
     )
 
+# ====
+# HELPER FUNCTIONS (Corrected Segment)
+# ====
+
 def generate_mock_response(query: str, context: str, system_prompt: str, has_document: bool) -> str:
-    """Generate mock response for testing"""
-    return f"""[DEMO MODE - Gemini API key not configured]
+    """Generate mock response for testing and ensure it avoids the f-string backslash error."""
+    
+    # Extract department name for display
+    department_match = re.search(r'You are a specialized AI assistant for ([\w\s&]+)', system_prompt)
+    department_name = department_match.group(1).strip() if department_match else 'N/A'
+
+    # Use standard string formatting (.format) instead of f-string literals 
+    # to avoid the parser error on Render's Python environment.
+    mock_response = """[DEMO MODE - Gemini API key not configured]
 
 Your question: {query}
 
@@ -542,10 +553,17 @@ This is a demonstration response. To get real AI-powered answers:
 2. Redeploy the application
 
 Configuration:
-- Department: {re.search(r'You are a specialized AI assistant for (\w+)', system_prompt).group(1) if re.search(r'You are a specialized AI assistant for (\w+)', system_prompt) else 'N/A'}
-- Document uploaded: {'Yes' if has_document else 'No'} (Preview: {context[:50]}...)
+- Department: {department_name}
+- Document uploaded: {has_document_status} (Preview: {context_preview}...)
 
 *All functionality is ready; needs API key.*"""
+    
+    return mock_response.format(
+        query=query,
+        department_name=department_name,
+        has_document_status='Yes' if has_document else 'No',
+        context_preview=context[:50]
+    )
 
 def enforce_whitelist_on_text(text: str) -> str:
     """Enforce URL whitelist compliance on text."""
