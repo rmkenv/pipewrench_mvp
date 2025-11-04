@@ -13,7 +13,7 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 # New Gemini Imports
 from google import genai
-from google.genai.errors import APIError, ResourceExhaustedError, InternalServerError
+from google.genai.errors import APIError, ClientError
 import os
 from datetime import datetime, timedelta
 from typing import Optional, Dict, List
