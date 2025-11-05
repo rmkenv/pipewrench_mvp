@@ -1,22 +1,10 @@
-# Core Web Framework
 fastapi==0.115.4
 uvicorn[standard]==0.32.0
-
-# Security-Critical Updates (Recommended)
-python-multipart>=0.0.18
-jinja2>=3.1.6
-
-# HTTP Clients
-httpx==0.27.2
+httpx>=0.28.1,<1.0.0
 requests==2.32.3
 certifi==2024.8.30
 urllib3==2.2.3
-
-# LLM/AI SDKs
-# *** FIX: Enforcing a newer version that has the required error classes ***
-google-genai>=1.47.0 
+google-genai>=1.48.0
 openai==1.54.3
-
-# Data/Utility
 pydantic==2.10.1
 pypdf==5.1.0
